@@ -2,11 +2,6 @@ name: Create Drips Wave Issues
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/create-wave-issues.yml'
 
 jobs:
   create-issues:
@@ -14,456 +9,413 @@ jobs:
     permissions:
       issues: write
     steps:
-      - name: Create Labels and Issues
+      - name: Create Issue 1 - THINK Token Vesting Contract
         uses: actions/github-script@v7
         with:
           script: |
-            // ── 1. Ensure all labels exist ─────────────────────────────────────
-            const labels = [
-              { name: 'good first issue', color: '7057ff', description: 'Good for newcomers' },
-              { name: 'smart-contract',   color: '0075ca', description: 'Smart contract development' },
-              { name: 'solidity',         color: 'e4e669', description: 'Solidity language' },
-              { name: 'token',            color: 'f9d0c4', description: 'Token-related work' },
-              { name: 'reputation',       color: 'bfd4f2', description: 'Reputation system' },
-              { name: 'nft',              color: 'fef2c0', description: 'NFT-related work' },
-              { name: 'governance',       color: 'cfd3d7', description: 'DAO governance' },
-              { name: 'bounty',           color: 'd93f0b', description: 'Bounty contracts' },
-              { name: 'defi',             color: '0e8a16', description: 'DeFi mechanics' },
-              { name: 'social',           color: 'e11d48', description: 'Social and community features' },
-              { name: 'registry',         color: '6366f1', description: 'Registry contracts' },
-              { name: 'advanced',         color: 'b60205', description: 'Advanced / complex tasks' },
-            ];
-            for (const label of labels) {
-              try {
-                await github.rest.issues.createLabel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  name: label.name,
-                  color: label.color,
-                  description: label.description,
-                });
-                console.log(`Created label: ${label.name}`);
-              } catch (err) {
-                if (err.status === 422) {
-                  console.log(`Label already exists: ${label.name}`);
-                } else {
-                  throw err;
-                }
-              }
-            }
-
-            // ── 2. Fetch all existing issues (open + closed) for deduplication ─
-            const existingIssues = [];
-            let page = 1;
-            while (true) {
-              const { data } = await github.rest.issues.listForRepo({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                state: 'all',
-                per_page: 100,
-                page,
-              });
-              if (data.length === 0) break;
-              existingIssues.push(...data.map(i => i.title));
-              page++;
-            }
-            console.log(`Found ${existingIssues.length} existing issue(s).`);
-
-            // Helper: create an issue only if its title does not already exist
-            async function ensureIssue(title, labels, body) {
-              if (existingIssues.includes(title)) {
-                console.log(`SKIP (already exists): ${title}`);
-                return;
-              }
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title,
-                labels,
-                body,
-              });
-              console.log(`CREATED: ${title}`);
-            }
-
-            // ── 3. The ten contributor issues ─────────────────────────────────
-
-            await ensureIssue(
-              'Implement THINK Token Vesting Contract',
-              ['smart-contract', 'solidity', 'token', 'good first issue'],
-              `**Location:** \`contracts/token/VestingSchedule.sol\`
-**Estimated Time:** 7 hours
-**Difficulty:** Medium
-
-### Description
-
-Build a token vesting contract that releases THINK tokens to contributors on a linear or cliff schedule, ensuring long-term alignment between contributors and the protocol.
-
-### Tasks
-
-- [ ] Design vesting schedule data structure (cliff, duration, amount)
-- [ ] Implement \`createVestingSchedule\` for assigning vesting to beneficiaries
-- [ ] Add linear release calculation based on elapsed time
-- [ ] Implement cliff vesting support (tokens locked until cliff date)
-- [ ] Create \`release\` function for beneficiaries to claim vested tokens
-- [ ] Add \`revoke\` function for admin to cancel unvested allocations
-- [ ] Implement multi-beneficiary batch vesting creation
-- [ ] Write comprehensive vesting schedule tests (>95% coverage)
-- [ ] Add NatSpec documentation on all public/external functions
-- [ ] Deploy and verify contract on Base Sepolia testnet
-
-### Acceptance Criteria
-
-- Vesting schedules created with correct parameters
-- Linear release calculated accurately over time
-- Cliff period enforced before any tokens release
-- Beneficiaries can only claim vested amounts
-- Admin revocation returns unvested tokens correctly
-- All events emitted on state changes
-- Contract deployed to testnet
-
----
-_Comment \`/apply\` to be assigned to this issue._`
-            );
-
-            await ensureIssue(
-              'Implement Reputation Score Decay Mechanism',
-              ['smart-contract', 'solidity', 'reputation', 'good first issue'],
-              `**Location:** \`contracts/reputation/ReputationDecay.sol\`
-**Estimated Time:** 6 hours
-**Difficulty:** Medium
-
-### Description
-
-Extend the ReputationRegistry with a decay mechanism so that inactive contributors see their reputation scores gradually decrease over time, incentivizing consistent participation.
-
-### Tasks
-
-- [ ] Design decay rate configuration (percentage per epoch)
-- [ ] Implement epoch-based decay calculation
-- [ ] Add last-active timestamp tracking per contributor
-- [ ] Create \`applyDecay\` function callable by anyone after an epoch passes
-- [ ] Implement minimum reputation floor (non-negative scores)
-- [ ] Add \`refreshActivity\` to reset decay timer on contribution
-- [ ] Create decay exemption list for core contributors
-- [ ] Write decay calculation and application tests (>95% coverage)
-- [ ] Add NatSpec documentation on all public/external functions
-- [ ] Deploy and verify contract on Base Sepolia testnet
-
-### Acceptance Criteria
-
-- Decay applied correctly after each epoch
-- Minimum floor prevents negative reputation
-- Activity refresh resets the decay timer
-- Exempted addresses unaffected by decay
-- Decay rate configurable by governance
-- Contract deployed to testnet
-
----
-_Comment \`/apply\` to be assigned to this issue._`
-            );
-
-            await ensureIssue(
-              'Implement Impact NFT Metadata Extension and Badge Tiers',
-              ['smart-contract', 'solidity', 'nft', 'good first issue'],
-              `**Location:** \`contracts/nft/ImpactNFT.sol\`
-**Estimated Time:** 5 hours
-**Difficulty:** Easy
-
-### Description
-
-Extend the ImpactNFT soulbound badge system with tiered badge levels (Bronze, Silver, Gold, Platinum) that upgrade automatically based on the holder's reputation score thresholds.
-
-### Tasks
-
-- [ ] Define badge tier enum (Bronze, Silver, Gold, Platinum)
-- [ ] Implement tier threshold configuration per tier level
-- [ ] Add \`upgradeBadge\` function to promote badge tier on reputation milestone
-- [ ] Create on-chain SVG metadata generation per tier
-- [ ] Implement badge tier display in \`tokenURI\` metadata
-- [ ] Add tier downgrade protection (soulbound tiers only go up)
-- [ ] Create batch tier evaluation for multiple holders
-- [ ] Write badge tier upgrade and metadata tests (>95% coverage)
-- [ ] Add \`TierUpgraded\` event with old and new tier
-- [ ] Add NatSpec documentation on all public/external functions
-- [ ] Deploy and verify contract on Base Sepolia testnet
-
-### Acceptance Criteria
-
-- Badges upgrade automatically at reputation thresholds
-- On-chain SVG metadata reflects correct tier
-- Tier downgrades are blocked (soulbound guarantee)
-- Batch evaluation processes all holders efficiently
-- tokenURI returns valid ERC-721 metadata JSON
-- Contract deployed to testnet
-
----
-_Comment \`/apply\` to be assigned to this issue._`
-            );
-
-            await ensureIssue(
-              'Implement DAO Proposal Templates Registry',
-              ['smart-contract', 'solidity', 'governance', 'good first issue'],
-              `**Location:** \`contracts/governance/ProposalTemplates.sol\`
-**Estimated Time:** 7 hours
-**Difficulty:** Medium
-
-### Description
-
-Create a proposal template registry that standardizes common governance actions (parameter updates, treasury spends, contract upgrades) so contributors can submit well-formed proposals without deep technical knowledge.
-
-### Tasks
-
-- [ ] Design template data structure (title, description, calldata schema)
-- [ ] Implement template registration by governance admin
-- [ ] Add template versioning for upgradeable templates
-- [ ] Create template-based proposal instantiation helper
-- [ ] Implement parameter validation for each template type
-- [ ] Add template usage tracking and analytics
-- [ ] Create template deprecation mechanism
-- [ ] Write template creation and usage tests (>95% coverage)
-- [ ] Add events for template registration and usage
-- [ ] Add NatSpec documentation on all public/external functions
-- [ ] Deploy and verify contract on Base Sepolia testnet
-
-### Acceptance Criteria
-
-- Templates registered with validated schemas
-- Template versioning preserves history
-- Proposals created from templates pass DAO validation
-- Parameter validation rejects malformed inputs
-- Deprecated templates cannot create new proposals
-- Contract deployed to testnet
-
----
-_Comment \`/apply\` to be assigned to this issue._`
-            );
-
-            await ensureIssue(
-              'Implement Multi-Stage Bounty Escrow Contract',
-              ['smart-contract', 'solidity', 'bounty', 'good first issue'],
-              `**Location:** \`contracts/bounty/MultiStageEscrow.sol\`
-**Estimated Time:** 8 hours
-**Difficulty:** Medium
-
-### Description
-
-Extend BountyEscrow to support multi-stage bounties where funds are released incrementally as a contributor completes predefined milestones, reducing payout risk for funders.
-
-### Tasks
-
-- [ ] Design milestone data structure (description, payout percentage, deadline)
-- [ ] Implement multi-milestone bounty creation with staged funding
-- [ ] Add milestone submission by assigned contributor
-- [ ] Create milestone approval flow for bounty creator
-- [ ] Implement partial payout on each approved milestone
-- [ ] Add dispute window between submission and approval
-- [ ] Create refund logic for expired or cancelled milestones
-- [ ] Write milestone lifecycle tests (>95% coverage)
-- [ ] Add events for each milestone state transition
-- [ ] Add NatSpec documentation on all public/external functions
-- [ ] Deploy and verify contract on Base Sepolia testnet
-
-### Acceptance Criteria
-
-- Milestones created with correct payout percentages summing to 100%
-- Submissions accepted only from assigned contributor
-- Partial payouts released on milestone approval
-- Dispute window enforced before final payout
-- Refunds issued for cancelled bounties
-- Contract deployed to testnet
-
----
-_Comment \`/apply\` to be assigned to this issue._`
-            );
-
-            await ensureIssue(
-              'Implement Contribution Staking and Yield Contract',
-              ['smart-contract', 'solidity', 'defi', 'good first issue'],
-              `**Location:** \`contracts/staking/ContributionStaking.sol\`
-**Estimated Time:** 7 hours
-**Difficulty:** Medium
-
-### Description
-
-Create a staking contract where contributors lock THINK tokens to signal commitment to the protocol, earn yield from platform fees, and gain boosted voting weight in MeshDAO governance.
-
-### Tasks
-
-- [ ] Design staking position structure (amount, lock duration, voting boost)
-- [ ] Implement \`stake\` function with variable lock durations (30/90/365 days)
-- [ ] Add yield accrual proportional to stake amount and lock duration
-- [ ] Create \`claimYield\` function for collecting accumulated rewards
-- [ ] Implement \`unstake\` with lock period enforcement
-- [ ] Add governance voting weight boost based on lock duration
-- [ ] Create emergency unstake with penalty for early withdrawal
-- [ ] Write staking lifecycle and yield calculation tests (>95% coverage)
-- [ ] Add events for stake, unstake, and yield claim
-- [ ] Add NatSpec documentation on all public/external functions
-- [ ] Deploy and verify contract on Base Sepolia testnet
-
-### Acceptance Criteria
-
-- Stake positions created with correct lock parameters
-- Yield accrues correctly based on time and amount
-- Unstake blocked until lock period expires
-- Voting weight boost applied in MeshDAO integration
-- Early withdrawal penalty distributed to treasury
-- Contract deployed to testnet
-
----
-_Comment \`/apply\` to be assigned to this issue._`
-            );
-
-            await ensureIssue(
-              'Implement Peer Review Voting System for Contributions',
-              ['smart-contract', 'solidity', 'social', 'advanced'],
-              `**Location:** \`contracts/review/PeerReview.sol\`
-**Estimated Time:** 9 hours
-**Difficulty:** Hard
-
-### Description
-
-Build a peer review contract where qualified contributors (those above a reputation threshold) vote on submitted solutions, with weighted voting based on reviewer reputation scores.
-
-### Tasks
-
-- [ ] Design review round structure (submission, voting window, quorum)
-- [ ] Implement reviewer eligibility check via ReputationRegistry
-- [ ] Add weighted voting where vote weight equals reviewer reputation score
-- [ ] Create anti-gaming: reviewers cannot review their own submissions
-- [ ] Implement commit-reveal voting scheme to prevent bandwagon bias
-- [ ] Add quorum requirement before finalizing review outcomes
-- [ ] Create reviewer reward distribution for participating in reviews
-- [ ] Write review lifecycle and weighted voting tests (>95% coverage)
-- [ ] Add events for review submission, vote cast, and outcome finalized
-- [ ] Add NatSpec documentation on all public/external functions
-- [ ] Deploy and verify contract on Base Sepolia testnet
-
-### Acceptance Criteria
-
-- Only eligible reviewers (above reputation threshold) can vote
-- Vote weights correctly reflect reviewer reputation
-- Commit-reveal prevents front-running and bias
-- Quorum enforced before outcomes are finalized
-- Reviewer rewards distributed proportionally
-- Contract deployed to testnet
-
----
-_Comment \`/apply\` to be assigned to this issue._`
-            );
-
-            await ensureIssue(
-              'Implement On-Chain Problem Registry Contract',
-              ['smart-contract', 'solidity', 'registry', 'good first issue'],
-              `**Location:** \`contracts/registry/ProblemRegistry.sol\`
-**Estimated Time:** 5 hours
-**Difficulty:** Easy
-
-### Description
-
-Create an on-chain registry for real-world problems submitted by community members, storing problem metadata, category tags, funding status, and linking to associated BountyEscrow contracts.
-
-### Tasks
-
-- [ ] Design problem record structure (title hash, IPFS CID, category, bounty link)
-- [ ] Implement problem submission with IPFS content addressing
-- [ ] Add problem categorization (infrastructure, health, education, environment)
-- [ ] Create problem upvoting mechanism (reputation-weighted)
-- [ ] Implement bounty attachment linking ProblemRegistry to BountyEscrow
-- [ ] Add problem status lifecycle (Open, Funded, In Progress, Solved, Closed)
-- [ ] Create problem search indexing via emitted events
-- [ ] Write problem lifecycle and upvote tests (>95% coverage)
-- [ ] Add events for problem submission, status change, and bounty attachment
-- [ ] Add NatSpec documentation on all public/external functions
-- [ ] Deploy and verify contract on Base Sepolia testnet
-
-### Acceptance Criteria
-
-- Problems submitted with valid IPFS CIDs
-- Categories enforce allowed taxonomy
-- Upvote weights reflect voter reputation
-- Bounty attachment verified against BountyEscrow
-- Status transitions follow valid lifecycle
-- Contract deployed to testnet
-
----
-_Comment \`/apply\` to be assigned to this issue._`
-            );
-
-            await ensureIssue(
-              'Implement Community Treasury Contract with Drips Integration',
-              ['smart-contract', 'solidity', 'defi', 'good first issue'],
-              `**Location:** \`contracts/treasury/CommunityTreasury.sol\`
-**Estimated Time:** 8 hours
-**Difficulty:** Medium
-
-### Description
-
-Build a community treasury contract that receives protocol revenue (bounty fees, staking fees), integrates with Drips for continuous streaming to contributors, and is controlled by MeshDAO governance.
-
-### Tasks
-
-- [ ] Design treasury allocation structure (percentages for contributors, operations, reserves)
-- [ ] Implement fee receiver interface for protocol revenue collection
-- [ ] Add Drips streaming integration for continuous contributor payouts
-- [ ] Create DAO-controlled allocation parameter updates
-- [ ] Implement emergency withdrawal with timelock
-- [ ] Add treasury balance reporting and analytics
-- [ ] Create grant disbursement function for DAO-approved grants
-- [ ] Write treasury allocation and streaming tests (>95% coverage)
-- [ ] Add events for deposits, allocations, and streaming setup
-- [ ] Add NatSpec documentation on all public/external functions
-- [ ] Deploy and verify contract on Base Sepolia testnet
-
-### Acceptance Criteria
-
-- Revenue received and allocated per governance-set percentages
-- Drips streaming configured correctly for contributor payouts
-- Allocation updates require DAO approval
-- Emergency withdrawal enforces timelock delay
-- Grant disbursements require DAO vote
-- Contract deployed to testnet
-
----
-_Comment \`/apply\` to be assigned to this issue._`
-            );
-
-            await ensureIssue(
-              'Implement Merkle Tree Airdrop Contract for THINK Token',
-              ['smart-contract', 'solidity', 'token', 'good first issue'],
-              `**Location:** \`contracts/token/MerkleAirdrop.sol\`
-**Estimated Time:** 6 hours
-**Difficulty:** Medium
-
-### Description
-
-Create a Merkle tree-based airdrop contract that allows eligible contributors to claim THINK token allocations using cryptographic proofs, enabling gas-efficient distribution to thousands of recipients.
-
-### Tasks
-
-- [ ] Design Merkle tree leaf structure (address, amount, nonce)
-- [ ] Implement \`setMerkleRoot\` for admin to configure airdrop rounds
-- [ ] Add \`claim\` function with Merkle proof verification
-- [ ] Create claimed bitmap to prevent double-claiming
-- [ ] Implement airdrop expiry with unclaimed token reclaim
-- [ ] Add multi-round airdrop support (separate Merkle roots per round)
-- [ ] Create off-chain proof generation helper script
-- [ ] Write Merkle proof verification and claim tests (>95% coverage)
-- [ ] Add events for claims and round configuration
-- [ ] Add NatSpec documentation on all public/external functions
-- [ ] Deploy and verify contract on Base Sepolia testnet
-
-### Acceptance Criteria
-
-- Merkle proof verification correctly validates eligible claimants
-- Double-claim attempts revert with clear error
-- Airdrop expiry allows reclaim of unclaimed tokens
-- Multi-round support isolates each distribution
-- Gas cost per claim is optimized (bitmap vs mapping)
-- Contract deployed to testnet
-
----
-_Comment \`/apply\` to be assigned to this issue._`
-            );
-
-            console.log('All done!');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Implement THINK Token Vesting Contract',
+              labels: ['smart-contract', 'solidity', 'token', 'good first issue'],
+              body: `**Location:** \`contracts/token/VestingSchedule.sol\`
+            **Labels:** smart-contract, solidity, token, good first issue
+            **Estimated Time:** 7 hours
+            **Difficulty:** Medium
+
+            ### Description
+
+            Build a token vesting contract that releases THINK tokens to contributors on a linear or cliff schedule, ensuring long-term alignment between contributors and the protocol.
+
+            ### Tasks
+
+            - Design vesting schedule data structure (cliff, duration, amount)
+            - Implement \`createVestingSchedule\` for assigning vesting to beneficiaries
+            - Add linear release calculation based on elapsed time
+            - Implement cliff vesting support (tokens locked until cliff date)
+            - Create \`release\` function for beneficiaries to claim vested tokens
+            - Add \`revoke\` function for admin to cancel unvested allocations
+            - Implement multi-beneficiary batch vesting creation
+            - Write comprehensive vesting schedule tests
+            - Add events for schedule creation, release, and revocation
+            - Deploy and verify contract on Base Sepolia testnet
+
+            ### Acceptance Criteria
+
+            - Vesting schedules created with correct parameters
+            - Linear release calculated accurately over time
+            - Cliff period enforced before any tokens release
+            - Beneficiaries can only claim vested amounts
+            - Admin revocation returns unvested tokens correctly
+            - All events emitted on state changes
+            - Contract deployed to testnet`
+            });
+
+      - name: Create Issue 2 - Reputation Score Decay Mechanism
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Implement Reputation Score Decay Mechanism',
+              labels: ['smart-contract', 'solidity', 'reputation', 'good first issue'],
+              body: `**Location:** \`contracts/reputation/ReputationDecay.sol\`
+            **Labels:** smart-contract, solidity, reputation, good first issue
+            **Estimated Time:** 6 hours
+            **Difficulty:** Medium
+
+            ### Description
+
+            Extend the ReputationRegistry with a decay mechanism so that inactive contributors see their reputation scores gradually decrease over time, incentivizing consistent participation.
+
+            ### Tasks
+
+            - Design decay rate configuration (percentage per epoch)
+            - Implement epoch-based decay calculation
+            - Add last-active timestamp tracking per contributor
+            - Create \`applyDecay\` function callable by anyone after an epoch passes
+            - Implement minimum reputation floor (non-negative scores)
+            - Add \`refreshActivity\` to reset decay timer on contribution
+            - Create decay exemption list for core contributors
+            - Write decay calculation and application tests
+            - Add events for decay events and activity refreshes
+            - Deploy and verify contract on Base Sepolia testnet
+
+            ### Acceptance Criteria
+
+            - Decay applied correctly after each epoch
+            - Minimum floor prevents negative reputation
+            - Activity refresh resets the decay timer
+            - Exempted addresses unaffected by decay
+            - Decay rate configurable by governance
+            - Contract deployed to testnet`
+            });
+
+      - name: Create Issue 3 - Impact NFT Metadata Extension
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Implement Impact NFT Metadata Extension and Badge Tiers',
+              labels: ['smart-contract', 'solidity', 'nft', 'good first issue'],
+              body: `**Location:** \`contracts/nft/ImpactNFT.sol\`
+            **Labels:** smart-contract, solidity, nft, good first issue
+            **Estimated Time:** 5 hours
+            **Difficulty:** Easy
+
+            ### Description
+
+            Extend the ImpactNFT soulbound badge system with tiered badge levels (Bronze, Silver, Gold, Platinum) that upgrade automatically based on the holder's reputation score thresholds.
+
+            ### Tasks
+
+            - Define badge tier enum (Bronze, Silver, Gold, Platinum)
+            - Implement tier threshold configuration per tier level
+            - Add \`upgradeBadge\` function to promote badge tier on reputation milestone
+            - Create on-chain SVG metadata generation per tier
+            - Implement badge tier display in \`tokenURI\` metadata
+            - Add tier downgrade protection (soulbound tiers only go up)
+            - Create batch tier evaluation for multiple holders
+            - Write badge tier upgrade and metadata tests
+            - Add \`TierUpgraded\` event with old and new tier
+            - Deploy and verify contract on Base Sepolia testnet
+
+            ### Acceptance Criteria
+
+            - Badges upgrade automatically at reputation thresholds
+            - On-chain SVG metadata reflects correct tier
+            - Tier downgrades are blocked (soulbound guarantee)
+            - Batch evaluation processes all holders efficiently
+            - tokenURI returns valid ERC-721 metadata JSON
+            - Contract deployed to testnet`
+            });
+
+      - name: Create Issue 4 - DAO Proposal Templates Registry
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Implement DAO Proposal Templates Registry',
+              labels: ['smart-contract', 'solidity', 'governance', 'good first issue'],
+              body: `**Location:** \`contracts/governance/ProposalTemplates.sol\`
+            **Labels:** smart-contract, solidity, governance, good first issue
+            **Estimated Time:** 7 hours
+            **Difficulty:** Medium
+
+            ### Description
+
+            Create a proposal template registry that standardizes common governance actions (parameter updates, treasury spends, contract upgrades) so contributors can submit well-formed proposals without deep technical knowledge.
+
+            ### Tasks
+
+            - Design template data structure (title, description, calldata schema)
+            - Implement template registration by governance admin
+            - Add template versioning for upgradeable templates
+            - Create template-based proposal instantiation helper
+            - Implement parameter validation for each template type
+            - Add template usage tracking and analytics
+            - Create template deprecation mechanism
+            - Write template creation and usage tests
+            - Add events for template registration and usage
+            - Deploy and verify contract on Base Sepolia testnet
+
+            ### Acceptance Criteria
+
+            - Templates registered with validated schemas
+            - Template versioning preserves history
+            - Proposals created from templates pass DAO validation
+            - Parameter validation rejects malformed inputs
+            - Deprecated templates cannot create new proposals
+            - Contract deployed to testnet`
+            });
+
+      - name: Create Issue 5 - Multi-Stage Bounty Escrow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Implement Multi-Stage Bounty Escrow Contract',
+              labels: ['smart-contract', 'solidity', 'bounty', 'good first issue'],
+              body: `**Location:** \`contracts/bounty/MultiStageEscrow.sol\`
+            **Labels:** smart-contract, solidity, bounty, good first issue
+            **Estimated Time:** 8 hours
+            **Difficulty:** Medium
+
+            ### Description
+
+            Extend BountyEscrow to support multi-stage bounties where funds are released incrementally as a contributor completes predefined milestones, reducing payout risk for funders.
+
+            ### Tasks
+
+            - Design milestone data structure (description, payout percentage, deadline)
+            - Implement multi-milestone bounty creation with staged funding
+            - Add milestone submission by assigned contributor
+            - Create milestone approval flow for bounty creator
+            - Implement partial payout on each approved milestone
+            - Add dispute window between submission and approval
+            - Create refund logic for expired or cancelled milestones
+            - Write milestone lifecycle tests
+            - Add events for each milestone state transition
+            - Deploy and verify contract on Base Sepolia testnet
+
+            ### Acceptance Criteria
+
+            - Milestones created with correct payout percentages summing to 100%
+            - Submissions accepted only from assigned contributor
+            - Partial payouts released on milestone approval
+            - Dispute window enforced before final payout
+            - Refunds issued for cancelled bounties
+            - Contract deployed to testnet`
+            });
+
+      - name: Create Issue 6 - Contribution Staking and Yield Contract
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Implement Contribution Staking and Yield Contract',
+              labels: ['smart-contract', 'solidity', 'defi', 'good first issue'],
+              body: `**Location:** \`contracts/staking/ContributionStaking.sol\`
+            **Labels:** smart-contract, solidity, defi, good first issue
+            **Estimated Time:** 7 hours
+            **Difficulty:** Medium
+
+            ### Description
+
+            Create a staking contract where contributors lock THINK tokens to signal commitment to the protocol, earn yield from platform fees, and gain boosted voting weight in MeshDAO governance.
+
+            ### Tasks
+
+            - Design staking position structure (amount, lock duration, voting boost)
+            - Implement \`stake\` function with variable lock durations (30/90/365 days)
+            - Add yield accrual proportional to stake amount and lock duration
+            - Create \`claimYield\` function for collecting accumulated rewards
+            - Implement \`unstake\` with lock period enforcement
+            - Add governance voting weight boost based on lock duration
+            - Create emergency unstake with penalty for early withdrawal
+            - Write staking lifecycle and yield calculation tests
+            - Add events for stake, unstake, and yield claim
+            - Deploy and verify contract on Base Sepolia testnet
+
+            ### Acceptance Criteria
+
+            - Stake positions created with correct lock parameters
+            - Yield accrues correctly based on time and amount
+            - Unstake blocked until lock period expires
+            - Voting weight boost applied in MeshDAO integration
+            - Early withdrawal penalty distributed to treasury
+            - Contract deployed to testnet`
+            });
+
+      - name: Create Issue 7 - Peer Review Voting System
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Implement Peer Review Voting System for Contributions',
+              labels: ['smart-contract', 'solidity', 'social', 'advanced'],
+              body: `**Location:** \`contracts/review/PeerReview.sol\`
+            **Labels:** smart-contract, solidity, social, advanced
+            **Estimated Time:** 9 hours
+            **Difficulty:** Hard
+
+            ### Description
+
+            Build a peer review contract where qualified contributors (those above a reputation threshold) vote on submitted solutions, with weighted voting based on reviewer reputation scores.
+
+            ### Tasks
+
+            - Design review round structure (submission, voting window, quorum)
+            - Implement reviewer eligibility check via ReputationRegistry
+            - Add weighted voting where vote weight equals reviewer reputation score
+            - Create anti-gaming: reviewers cannot review their own submissions
+            - Implement commit-reveal voting scheme to prevent bandwagon bias
+            - Add quorum requirement before finalizing review outcomes
+            - Create reviewer reward distribution for participating in reviews
+            - Write review lifecycle and weighted voting tests
+            - Add events for review submission, vote cast, and outcome finalized
+            - Deploy and verify contract on Base Sepolia testnet
+
+            ### Acceptance Criteria
+
+            - Only eligible reviewers (above reputation threshold) can vote
+            - Vote weights correctly reflect reviewer reputation
+            - Commit-reveal prevents front-running and bias
+            - Quorum enforced before outcomes are finalized
+            - Reviewer rewards distributed proportionally
+            - Contract deployed to testnet`
+            });
+
+      - name: Create Issue 8 - On-Chain Problem Registry
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Implement On-Chain Problem Registry Contract',
+              labels: ['smart-contract', 'solidity', 'registry', 'good first issue'],
+              body: `**Location:** \`contracts/registry/ProblemRegistry.sol\`
+            **Labels:** smart-contract, solidity, registry, good first issue
+            **Estimated Time:** 5 hours
+            **Difficulty:** Easy
+
+            ### Description
+
+            Create an on-chain registry for real-world problems submitted by community members, storing problem metadata, category tags, funding status, and linking to associated BountyEscrow contracts.
+
+            ### Tasks
+
+            - Design problem record structure (title hash, IPFS CID, category, bounty link)
+            - Implement problem submission with IPFS content addressing
+            - Add problem categorization (infrastructure, health, education, environment)
+            - Create problem upvoting mechanism (reputation-weighted)
+            - Implement bounty attachment linking ProblemRegistry to BountyEscrow
+            - Add problem status lifecycle (Open, Funded, In Progress, Solved, Closed)
+            - Create problem search indexing via emitted events
+            - Write problem lifecycle and upvote tests
+            - Add events for problem submission, status change, and bounty attachment
+            - Deploy and verify contract on Base Sepolia testnet
+
+            ### Acceptance Criteria
+
+            - Problems submitted with valid IPFS CIDs
+            - Categories enforce allowed taxonomy
+            - Upvote weights reflect voter reputation
+            - Bounty attachment verified against BountyEscrow
+            - Status transitions follow valid lifecycle
+            - Contract deployed to testnet`
+            });
+
+      - name: Create Issue 9 - Community Treasury Contract
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Implement Community Treasury Contract with Drips Integration',
+              labels: ['smart-contract', 'solidity', 'defi', 'good first issue'],
+              body: `**Location:** \`contracts/treasury/CommunityTreasury.sol\`
+            **Labels:** smart-contract, solidity, defi, good first issue
+            **Estimated Time:** 8 hours
+            **Difficulty:** Medium
+
+            ### Description
+
+            Build a community treasury contract that receives protocol revenue (bounty fees, staking fees), integrates with Drips for continuous streaming to contributors, and is controlled by MeshDAO governance.
+
+            ### Tasks
+
+            - Design treasury allocation structure (percentages for contributors, operations, reserves)
+            - Implement fee receiver interface for protocol revenue collection
+            - Add Drips streaming integration for continuous contributor payouts
+            - Create DAO-controlled allocation parameter updates
+            - Implement emergency withdrawal with timelock
+            - Add treasury balance reporting and analytics
+            - Create grant disbursement function for DAO-approved grants
+            - Write treasury allocation and streaming tests
+            - Add events for deposits, allocations, and streaming setup
+            - Deploy and verify contract on Base Sepolia testnet
+
+            ### Acceptance Criteria
+
+            - Revenue received and allocated per governance-set percentages
+            - Drips streaming configured correctly for contributor payouts
+            - Allocation updates require DAO approval
+            - Emergency withdrawal enforces timelock delay
+            - Grant disbursements require DAO vote
+            - Contract deployed to testnet`
+            });
+
+      - name: Create Issue 10 - Merkle Airdrop for THINK Token
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Implement Merkle Tree Airdrop Contract for THINK Token',
+              labels: ['smart-contract', 'solidity', 'token', 'good first issue'],
+              body: `**Location:** \`contracts/token/MerkleAirdrop.sol\`
+            **Labels:** smart-contract, solidity, token, good first issue
+            **Estimated Time:** 6 hours
+            **Difficulty:** Medium
+
+            ### Description
+
+            Create a Merkle tree-based airdrop contract that allows eligible contributors to claim THINK token allocations using cryptographic proofs, enabling gas-efficient distribution to thousands of recipients.
+
+            ### Tasks
+
+            - Design Merkle tree leaf structure (address, amount, nonce)
+            - Implement \`setMerkleRoot\` for admin to configure airdrop rounds
+            - Add \`claim\` function with Merkle proof verification
+            - Create claimed bitmap to prevent double-claiming
+            - Implement airdrop expiry with unclaimed token reclaim
+            - Add multi-round airdrop support (separate Merkle roots per round)
+            - Create off-chain proof generation helper script
+            - Write Merkle proof verification and claim tests
+            - Add events for claims and round configuration
+            - Deploy and verify contract on Base Sepolia testnet
+
+            ### Acceptance Criteria
+
+            - Merkle proof verification correctly validates eligible claimants
+            - Double-claim attempts revert with clear error
+            - Airdrop expiry allows reclaim of unclaimed tokens
+            - Multi-round support isolates each distribution
+            - Gas cost per claim is optimized (bitmap vs mapping)
+            - Contract deployed to testnet`
+            });
