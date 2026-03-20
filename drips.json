@@ -1,0 +1,29 @@
+{
+  "$schema": "https://drips.network/drips.schema.json",
+  "projectName": "mesh-contract",
+  "description": "Smart contracts powering the ThinkMesh protocol — on-chain reputation, rewards, and governance for collaborative problem solving.",
+  "url": "https://github.com/ThinknetCollective/mesh-contract",
+  "wave": {
+    "number": 1,
+    "name": "Wave 1 — Foundation",
+    "status": "active",
+    "goal": "Fund the deployment and auditing of core smart contracts: THINK token, Reputation Registry, Impact NFTs, and DAO governance.",
+    "startDate": "2026-03-01",
+    "endDate": "2026-06-30"
+  },
+  "setupNote": "Add your team wallet address as a split recipient before activating on Drips. See: https://docs.drips.network/drips-json",
+  "splits": [
+    {
+      "type": "repoDriver",
+      "url": "https://github.com/ThinknetCollective/thinkmesh-api",
+      "weight": 500000,
+      "comment": "ThinkMesh API (50%) — backend integration with smart contracts"
+    },
+    {
+      "type": "repoDriver",
+      "url": "https://github.com/ThinknetCollective/mesh-up_api",
+      "weight": 500000,
+      "comment": "Mesh API (50%) — quality scoring and reputation bridge"
+    }
+  ]
+}
