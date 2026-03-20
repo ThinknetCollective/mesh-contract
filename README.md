@@ -220,11 +220,26 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - Pull request process
 - Security disclosure policy
 
+### 🎯 Open Issues — Apply Now
+
+We maintain a list of open, well-scoped issues that contributors can pick up and implement:
+
+| Label | Description |
+|---|---|
+| [`good first issue`](https://github.com/ThinknetCollective/mesh-contract/issues?q=is%3Aopen+label%3A%22good+first+issue%22) | Beginner-friendly tasks (Easy–Medium, 5–8 hrs) |
+| [`smart-contract`](https://github.com/ThinknetCollective/mesh-contract/issues?q=is%3Aopen+label%3Asmart-contract) | All Solidity contract work |
+| [`advanced`](https://github.com/ThinknetCollective/mesh-contract/issues?q=is%3Aopen+label%3Aadvanced) | Complex tasks for experienced contributors |
+
+**To claim an issue:**
+1. Comment `/apply` on the issue you want to work on
+2. A maintainer will assign it to you
+3. Fork, implement, and open a PR referencing the issue
+
 **Quick ways to contribute:**
-- 🐛 Report bugs
-- 💡 Suggest improvements
-- 🔧 Submit pull requests
-- 🔐 Responsible security disclosure
+- 🐛 [Report bugs](https://github.com/ThinknetCollective/mesh-contract/issues/new?template=bug_report.yml)
+- 💡 [Suggest features](https://github.com/ThinknetCollective/mesh-contract/issues/new?template=feature_request.yml)
+- 🔧 [Propose a contract](https://github.com/ThinknetCollective/mesh-contract/issues/new?template=smart_contract.yml)
+- 🔐 Responsible security disclosure: security@thinkmesh.io
 
 ---
 
