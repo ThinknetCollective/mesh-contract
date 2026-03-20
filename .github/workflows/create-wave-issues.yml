@@ -9,6 +9,43 @@ jobs:
     permissions:
       issues: write
     steps:
+      - name: Create Labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              { name: 'good first issue', color: '7057ff', description: 'Good for newcomers' },
+              { name: 'smart-contract', color: '0075ca', description: 'Smart contract development' },
+              { name: 'solidity', color: 'e4e669', description: 'Solidity language' },
+              { name: 'token', color: 'f9d0c4', description: 'Token-related work' },
+              { name: 'reputation', color: 'bfd4f2', description: 'Reputation system' },
+              { name: 'nft', color: 'fef2c0', description: 'NFT-related work' },
+              { name: 'governance', color: 'cfd3d7', description: 'DAO governance' },
+              { name: 'bounty', color: 'd93f0b', description: 'Bounty contracts' },
+              { name: 'defi', color: '0e8a16', description: 'DeFi mechanics' },
+              { name: 'social', color: 'e11d48', description: 'Social and community features' },
+              { name: 'registry', color: '6366f1', description: 'Registry contracts' },
+              { name: 'advanced', color: 'b60205', description: 'Advanced / complex tasks' },
+            ];
+            for (const label of labels) {
+              try {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name,
+                  color: label.color,
+                  description: label.description,
+                });
+                console.log(`Created label: ${label.name}`);
+              } catch (err) {
+                if (err.status === 422) {
+                  console.log(`Label already exists: ${label.name}`);
+                } else {
+                  throw err;
+                }
+              }
+            }
+
       - name: Create Issue 1 - THINK Token Vesting Contract
         uses: actions/github-script@v7
         with:

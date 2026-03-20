@@ -1,0 +1,64 @@
+name: Bug Report
+description: Report a bug in a smart contract or tooling
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out this form as completely as possible.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug.
+      placeholder: Describe what happened…
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce the issue?
+      placeholder: |
+        1. Deploy contract with…
+        2. Call function `foo()` with…
+        3. Observe…
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+    validations:
+      required: true
+
+  - type: input
+    id: contract
+    attributes:
+      label: Affected Contract
+      description: Which contract file is affected?
+      placeholder: "e.g. contracts/token/ThinkToken.sol"
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Node version, Hardhat version, Solidity version, network
+      placeholder: |
+        - Node: 18.x
+        - Hardhat: 2.x
+        - Solidity: 0.8.20
+        - Network: Base Sepolia
