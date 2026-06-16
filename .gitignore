@@ -6,6 +6,12 @@ artifacts/
 cache/
 typechain/
 typechain-types/
+target/
+Cargo.lock
+
+# Soroban
+.deploy/
+*.wasm
 
 # Coverage
 coverage/
@@ -15,6 +21,7 @@ coverage.json
 .env
 .env.local
 .env.*.local
+.env.testnet
 
 # Hardhat
 .hardhat/

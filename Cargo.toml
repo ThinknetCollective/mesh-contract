@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = [
+    "contracts/registry",
+    "contracts/escrow",
+    "contracts/settlement",
+]
+
+[workspace.dependencies]
+soroban-sdk = "20.0.0"
+soroban-sdk-macros = "20.0.0"
