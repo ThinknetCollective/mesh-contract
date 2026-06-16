@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "contracts/escrow",
+    "contracts/settlement",
+    "contracts/registry",
+]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
