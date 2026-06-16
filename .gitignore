@@ -37,3 +37,7 @@ dist/
 
 # Misc
 *.tgz
+
+# Rust / Cargo
+target/
+Cargo.lock
