@@ -3,9 +3,9 @@
 **Smart contracts powering the ThinkMesh protocol — on-chain reputation, rewards, and governance.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Solidity](https://img.shields.io/badge/Solidity-%5E0.8.20-blue)](https://soliditylang.org/)
-[![Hardhat](https://img.shields.io/badge/Built%20with-Hardhat-yellow)](https://hardhat.org/)
-[![Base Network](https://img.shields.io/badge/Base-Network-0052FF)](https://base.org/)
+[![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange)](https://www.rust-lang.org/)
+[![Soroban](https://img.shields.io/badge/Soroban-20.0.0-blue)](https://soroban.stellar.org/)
+[![Stellar](https://img.shields.io/badge/Stellar-Testnet-7C3AED)](https://stellar.org/)
 [![Drips Wave](https://img.shields.io/badge/💧%20Drips-Wave%201%20Active-7C3AED)](https://www.drips.network/)
 
 ---
@@ -63,21 +63,15 @@ Your contribution via [Drips](https://www.drips.network/) streams directly to th
 
 ```
 contracts/
-├── token/
-│   └── ThinkToken.sol         # ERC-20 THINK reward token
-├── reputation/
-│   └── ReputationRegistry.sol # On-chain contribution scores
-├── nft/
-│   └── ImpactNFT.sol          # Soulbound impact badges (ERC-5192)
-├── governance/
-│   ├── MeshDAO.sol            # DAO voting & proposals
-│   └── TimelockController.sol # Execution delay for proposals
-├── bounty/
-│   └── BountyEscrow.sol       # Escrow for funded challenges
-└── interfaces/
-    ├── IThinkToken.sol
-    ├── IReputationRegistry.sol
-    └── IBountyEscrow.sol
+├── registry/
+│   └── src/lib.rs            # Wave Program registration contract
+├── escrow/
+│   └── src/lib.rs            # Wave escrow for fund management
+├── settlement/
+│   └── src/lib.rs            # Wave settlement and distribution
+scripts/
+├── deploy.sh                 # Automated testnet deployment
+└── seed_testnet.sh           # Testnet data seeding
 ```
 
 ---
@@ -86,9 +80,9 @@ contracts/
 
 ### Prerequisites
 
-- Node.js >= 18.0.0
-- npm or yarn
-- A wallet with Base testnet ETH ([get some here](https://docs.base.org/docs/tools/network-faucets))
+- Rust >= 1.70.0
+- Soroban CLI (install via `cargo install soroban-cli`)
+- Stellar testnet account (get funded via [Friendbot](https://friendbot.stellar.org))
 
 ### Setup
 
@@ -97,32 +91,45 @@ contracts/
 git clone https://github.com/ThinknetCollective/mesh-contract.git
 cd mesh-contract
 
-# Install dependencies
-npm install
+# Install Rust toolchain for Soroban
+rustup target add wasm32-unknown-unknown
+cargo install soroban-cli
 
 # Copy environment variables
-cp .env.example .env
-# Edit .env with your private key and RPC URLs
+cp .env.testnet.example .env.testnet
+# Edit .env.testnet with your Stellar secret key
 
-# Compile contracts
-npm run compile
+# Build contracts (native build)
+cargo build
 
-# Run tests
-npm test
+# Build WASM for deployment (requires soroban-cli)
+cargo build --release --target wasm32-unknown-unknown
 
-# Deploy to Base testnet
-npm run deploy:testnet
+# Run tests (requires soroban-cli test features)
+cargo test
+
+# Deploy to Stellar testnet
+./scripts/deploy.sh
+
+# Seed testnet with sample data
+./scripts/seed_testnet.sh
 ```
+
+### Current Status
+
+- ✅ Contracts compile successfully with `cargo build`
+- ✅ Soroban SDK 20.5.0 compatibility issues resolved
+- ⚠️ WASM compilation requires soroban-cli installation
+- ⚠️ Unit tests have dependency issues with soroban-sdk test features
+- 📝 Deployment scripts ready for use after soroban-cli installation
 
 ### Environment Variables
 
 ```bash
-# .env.example
-PRIVATE_KEY=your_wallet_private_key
-BASE_MAINNET_RPC=https://mainnet.base.org
-BASE_TESTNET_RPC=https://sepolia.base.org
-BASESCAN_API_KEY=your_basescan_api_key
-REPORT_GAS=true
+# .env.testnet
+DEPLOYER_SECRET_KEY=your_stellar_secret_key
+STELLAR_NETWORK=testnet
+STELLAR_RPC_URL=https://soroban-testnet.stellar.org:443
 ```
 
 ---
@@ -131,13 +138,11 @@ REPORT_GAS=true
 
 | Contract | Network | Address |
 |---|---|---|
-| ThinkToken | Base Mainnet | *Coming soon* |
-| ReputationRegistry | Base Mainnet | *Coming soon* |
-| ImpactNFT | Base Mainnet | *Coming soon* |
-| MeshDAO | Base Mainnet | *Coming soon* |
-| BountyEscrow | Base Mainnet | *Coming soon* |
+| Registry | Stellar Testnet | Run `./scripts/deploy.sh` to deploy |
+| Escrow | Stellar Testnet | Run `./scripts/deploy.sh` to deploy |
+| Settlement | Stellar Testnet | Run `./scripts/deploy.sh` to deploy |
 
-> Testnet deployments available on Base Sepolia.
+> Testnet deployments are automated via deployment scripts.
 
 ---
 
@@ -145,24 +150,21 @@ REPORT_GAS=true
 
 | Layer | Technology |
 |---|---|
-| Smart contracts | Solidity ^0.8.20 |
-| Framework | Hardhat |
-| Testing | Mocha + Chai + Waffle |
-| OpenZeppelin | Contracts v5 |
-| Network | Base (Coinbase L2) |
-| Token standard | ERC-20 (THINK) |
-| NFT standard | ERC-5192 (Soulbound) |
-| Governance | OpenZeppelin Governor |
+| Smart contracts | Rust + Soroban SDK |
+| Framework | Soroban 20.0.0 |
+| Testing | Soroban SDK testutils |
+| Network | Stellar (Soroban) |
+| Contract types | Registry, Escrow, Settlement |
 
-### Why Base (Not Ethereum Mainnet)?
+### Why Stellar (Soroban)?
 
-| Feature | Base | Ethereum L1 |
+| Feature | Stellar | Ethereum L1 |
 |---|---|---|
-| Gas fee | ~$0.001 | ~$2–50 |
-| Speed | ~2 seconds | ~12 seconds |
-| Security | ✅ Ethereum-backed | ✅ Native |
-| Developer UX | ✅ EVM-compatible | ✅ EVM |
-| Accessibility | ✅ Low cost for all | ❌ Expensive for small users |
+| Gas fee | ~$0.0001 | ~$2–50 |
+| Speed | ~5 seconds | ~12 seconds |
+| Security | ✅ SCP consensus | ✅ PoW/PoS |
+| Developer UX | ✅ Rust-based | ✅ EVM |
+| Accessibility | ✅ Very low cost | ❌ Expensive for small users |
 
 ---
 
@@ -170,9 +172,10 @@ REPORT_GAS=true
 
 ### ✅ Phase 1: Foundation (Q1 2026)
 - [x] Repository setup & architecture design
-- [ ] THINK token (ERC-20) deployment
-- [ ] Basic reputation registry
-- [ ] Testnet deployment
+- [x] Soroban contract development
+- [x] Testnet deployment scripts
+- [ ] Comprehensive test coverage
+- [ ] Mainnet deployment
 
 ### 🚧 Phase 2: NFT & Governance (Q2 2026)
 - [ ] ImpactNFT soulbound badges
@@ -198,16 +201,94 @@ REPORT_GAS=true
 
 ```bash
 # Run all tests
-npm test
+cargo test
 
-# Run tests with gas reporting
-REPORT_GAS=true npm test
+# Run tests with output
+cargo test -- --nocapture
 
-# Run coverage report
-npm run coverage
+# Run specific contract tests
+cargo test -p registry
+cargo test -p escrow
+cargo test -p settlement
+```
 
-# Run static analysis (Slither)
-npm run slither
+---
+
+## 🚀 Stellar Testnet Deployment
+
+### Prerequisites
+
+1. **Install Rust and Soroban CLI**
+   ```bash
+   rustup target add wasm32-unknown-unknown
+   cargo install soroban-cli
+   ```
+
+2. **Generate a Stellar Key Pair**
+   ```bash
+   soroban keys generate --network testnet
+   ```
+   This will generate a public key and secret key. Save the secret key securely.
+
+3. **Fund Your Testnet Account**
+   Visit [Stellar Friendbot](https://friendbot.stellar.org) and enter your public key to get testnet XLM.
+
+### Deployment Steps
+
+1. **Configure Environment**
+   ```bash
+   cp .env.testnet.example .env.testnet
+   # Edit .env.testnet and set DEPLOYER_SECRET_KEY
+   ```
+
+2. **Build Contracts**
+   ```bash
+   cargo build --release --target wasm32-unknown-unknown
+   ```
+
+3. **Deploy to Testnet**
+   ```bash
+   ./scripts/deploy.sh
+   ```
+   This script will:
+   - Deploy Registry contract
+   - Deploy Escrow contract
+   - Deploy Settlement contract
+   - Initialize all contracts with proper wiring
+   - Save contract IDs to `.env.testnet`
+
+4. **Seed Test Data**
+   ```bash
+   ./scripts/seed_testnet.sh
+   ```
+   This script will:
+   - Register a sample Wave Program
+   - Open a Wave escrow
+   - Fund the escrow
+   - Create and approve a settlement proposal
+
+### Verification
+
+After deployment, you can verify the contracts are deployed correctly by checking the contract IDs in `.env.testnet`.
+
+### Manual Contract Invocation
+
+You can manually invoke contracts using the Soroban CLI:
+
+```bash
+# Read program details
+soroban contract read \
+  --id $REGISTRY_CONTRACT_ID \
+  --fn get_program \
+  --program_id your_program_id \
+  --rpc-url https://soroban-testnet.stellar.org:443
+
+# Read wave details
+soroban contract read \
+  --id $ESCROW_CONTRACT_ID \
+  --fn get_wave \
+  --wave_id your_wave_id \
+  --rpc-url https://soroban-testnet.stellar.org:443
 ```
 
 ---
