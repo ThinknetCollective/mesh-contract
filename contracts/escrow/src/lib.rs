@@ -194,6 +194,30 @@ impl EscrowContract {
         }
     }
 
+    /// Release funds from a Wave escrow (called by settlement contract)
+    pub fn release(env: Env, wave_id: String, _contributor: Address, amount: i128) {
+        let wave_key = symbol_short!("wave");
+        if let Some((program_id, creator, current_amount, status)) =
+            env.storage().instance().get::<_, (String, Address, i128, u32)>(&(wave_key, wave_id.clone()))
+        {
+            // Allow status 1 (Funded) or 2 (Settling/Settled)
+            if status != 1u32 && status != 2u32 {
+                panic!("Wave is not funded or already finalized");
+            }
+
+            if amount > current_amount {
+                panic!("Insufficient funds in escrow");
+            }
+
+            let new_amount = current_amount - amount;
+            env.storage()
+                .instance()
+                .set(&(wave_key, wave_id), &(program_id, creator, new_amount, status));
+        } else {
+            panic!("Wave not found");
+        }
+    }
+
     /// Get wave count
     pub fn get_wave_count(env: Env) -> u32 {
         let count_key = symbol_short!("wave_cnt");
