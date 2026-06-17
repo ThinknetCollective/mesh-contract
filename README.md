@@ -5,6 +5,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/Rust-1.70+-orange)](https://www.rust-lang.org/)
 [![Soroban](https://img.shields.io/badge/Soroban-20.0.0-purple)](https://soroban.stellar.org/)
+[![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange)](https://www.rust-lang.org/)
+[![Soroban](https://img.shields.io/badge/Soroban-20.0.0-blue)](https://soroban.stellar.org/)
 [![Stellar](https://img.shields.io/badge/Stellar-Testnet-7C3AED)](https://stellar.org/)
 [![Drips Wave](https://img.shields.io/badge/💧%20Drips-Wave%201%20Active-7C3AED)](https://www.drips.network/)
 
@@ -72,6 +74,14 @@ contracts/
 scripts/
 ├── deploy.sh                  # Stellar testnet deployment script
 └── seed_testnet.sh            # Testnet seeding script
+│   └── src/lib.rs            # Wave Program registration contract
+├── escrow/
+│   └── src/lib.rs            # Wave escrow for fund management
+├── settlement/
+│   └── src/lib.rs            # Wave settlement and distribution
+scripts/
+├── deploy.sh                 # Automated testnet deployment
+└── seed_testnet.sh           # Testnet data seeding
 ```
 
 ---
@@ -84,6 +94,8 @@ scripts/
 - Stellar CLI (soroban-cli)
 - Stellar SDK
 - A wallet with Stellar testnet XLM (funded via Friendbot)
+- Soroban CLI (install via `cargo install soroban-cli`)
+- Stellar testnet account (get funded via [Friendbot](https://friendbot.stellar.org))
 
 ### Setup
 
@@ -123,6 +135,35 @@ For Windows users, PowerShell scripts are also provided:
 ```
 
 **Note:** Windows users experiencing build issues should use WSL (Windows Subsystem for Linux) or see [BUILD_ISSUES.md](BUILD_ISSUES.md) for workarounds.
+cargo install soroban-cli
+
+# Copy environment variables
+cp .env.testnet.example .env.testnet
+# Edit .env.testnet with your Stellar secret key
+
+# Build contracts (native build)
+cargo build
+
+# Build WASM for deployment (requires soroban-cli)
+cargo build --release --target wasm32-unknown-unknown
+
+# Run tests (requires soroban-cli test features)
+cargo test
+
+# Deploy to Stellar testnet
+./scripts/deploy.sh
+
+# Seed testnet with sample data
+./scripts/seed_testnet.sh
+```
+
+### Current Status
+
+- ✅ Contracts compile successfully with `cargo build`
+- ✅ Soroban SDK 20.5.0 compatibility issues resolved
+- ⚠️ WASM compilation requires soroban-cli installation
+- ⚠️ Unit tests have dependency issues with soroban-sdk test features
+- 📝 Deployment scripts ready for use after soroban-cli installation
 
 ### Environment Variables
 
@@ -136,6 +177,10 @@ DEPLOYER_ADDRESS=your_deployer_address
 REGISTRY_CONTRACT_ID=deployed_registry_contract_id
 ESCROW_CONTRACT_ID=deployed_escrow_contract_id
 SETTLEMENT_CONTRACT_ID=deployed_settlement_contract_id
+# .env.testnet
+DEPLOYER_SECRET_KEY=your_stellar_secret_key
+STELLAR_NETWORK=testnet
+STELLAR_RPC_URL=https://soroban-testnet.stellar.org:443
 ```
 
 ---
@@ -149,6 +194,11 @@ SETTLEMENT_CONTRACT_ID=deployed_settlement_contract_id
 | Settlement | Stellar Testnet | Deployed via `scripts/deploy.sh` |
 
 > Contract IDs are saved to `.env.testnet` after deployment.
+| Registry | Stellar Testnet | Run `./scripts/deploy.sh` to deploy |
+| Escrow | Stellar Testnet | Run `./scripts/deploy.sh` to deploy |
+| Settlement | Stellar Testnet | Run `./scripts/deploy.sh` to deploy |
+
+> Testnet deployments are automated via deployment scripts.
 
 ---
 
@@ -172,6 +222,20 @@ SETTLEMENT_CONTRACT_ID=deployed_settlement_contract_id
 | Security | ✅ Stellar SCP | ✅ Native |
 | Developer UX | ✅ Rust-based | ✅ EVM |
 | Accessibility | ✅ Low cost for all | ❌ Expensive for small users |
+| Framework | Soroban 20.0.0 |
+| Testing | Soroban SDK testutils |
+| Network | Stellar (Soroban) |
+| Contract types | Registry, Escrow, Settlement |
+
+### Why Stellar (Soroban)?
+
+| Feature | Stellar | Ethereum L1 |
+|---|---|---|
+| Gas fee | ~$0.0001 | ~$2–50 |
+| Speed | ~5 seconds | ~12 seconds |
+| Security | ✅ SCP consensus | ✅ PoW/PoS |
+| Developer UX | ✅ Rust-based | ✅ EVM |
+| Accessibility | ✅ Very low cost | ❌ Expensive for small users |
 
 ---
 
@@ -188,6 +252,15 @@ SETTLEMENT_CONTRACT_ID=deployed_settlement_contract_id
 ### 🚧 Phase 2: Testing & Integration (Q2 2026)
 - [ ] Comprehensive contract tests
 - [ ] Integration tests
+- [x] Soroban contract development
+- [x] Testnet deployment scripts
+- [ ] Comprehensive test coverage
+- [ ] Mainnet deployment
+
+### 🚧 Phase 2: NFT & Governance (Q2 2026)
+- [ ] ImpactNFT soulbound badges
+- [ ] MeshDAO voting contracts
+- [ ] Timelock controller
 - [ ] Security audit
 - [ ] Mainnet deployment
 
@@ -217,6 +290,93 @@ cargo test -- --nocapture
 cargo test -p registry
 cargo test -p escrow
 cargo test -p settlement
+
+# Run tests with output
+cargo test -- --nocapture
+
+# Run specific contract tests
+cargo test -p registry
+cargo test -p escrow
+cargo test -p settlement
+```
+
+---
+
+## 🚀 Stellar Testnet Deployment
+
+### Prerequisites
+
+1. **Install Rust and Soroban CLI**
+   ```bash
+   rustup target add wasm32-unknown-unknown
+   cargo install soroban-cli
+   ```
+
+2. **Generate a Stellar Key Pair**
+   ```bash
+   soroban keys generate --network testnet
+   ```
+   This will generate a public key and secret key. Save the secret key securely.
+
+3. **Fund Your Testnet Account**
+   Visit [Stellar Friendbot](https://friendbot.stellar.org) and enter your public key to get testnet XLM.
+
+### Deployment Steps
+
+1. **Configure Environment**
+   ```bash
+   cp .env.testnet.example .env.testnet
+   # Edit .env.testnet and set DEPLOYER_SECRET_KEY
+   ```
+
+2. **Build Contracts**
+   ```bash
+   cargo build --release --target wasm32-unknown-unknown
+   ```
+
+3. **Deploy to Testnet**
+   ```bash
+   ./scripts/deploy.sh
+   ```
+   This script will:
+   - Deploy Registry contract
+   - Deploy Escrow contract
+   - Deploy Settlement contract
+   - Initialize all contracts with proper wiring
+   - Save contract IDs to `.env.testnet`
+
+4. **Seed Test Data**
+   ```bash
+   ./scripts/seed_testnet.sh
+   ```
+   This script will:
+   - Register a sample Wave Program
+   - Open a Wave escrow
+   - Fund the escrow
+   - Create and approve a settlement proposal
+
+### Verification
+
+After deployment, you can verify the contracts are deployed correctly by checking the contract IDs in `.env.testnet`.
+
+### Manual Contract Invocation
+
+You can manually invoke contracts using the Soroban CLI:
+
+```bash
+# Read program details
+soroban contract read \
+  --id $REGISTRY_CONTRACT_ID \
+  --fn get_program \
+  --program_id your_program_id \
+  --rpc-url https://soroban-testnet.stellar.org:443
+
+# Read wave details
+soroban contract read \
+  --id $ESCROW_CONTRACT_ID \
+  --fn get_wave \
+  --wave_id your_wave_id \
+  --rpc-url https://soroban-testnet.stellar.org:443
 ```
 
 ---
