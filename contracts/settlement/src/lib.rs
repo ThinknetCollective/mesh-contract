@@ -1,5 +1,12 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, String, IntoVal};
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContributorPoints {
+    pub address: Address,
+    pub points: i128,
+}
 
 #[contract]
 pub struct SettlementContract;
@@ -96,6 +103,59 @@ impl SettlementContract {
     pub fn get_settlement_count(env: Env) -> u32 {
         let count_key = symbol_short!("stl_cnt");
         env.storage().instance().get::<_, u32>(&count_key).unwrap()
+    }
+
+    /// Settle a Wave with proportional rewards
+    pub fn settle_wave(
+        env: Env,
+        wave_id: String,
+        contributor_points: soroban_sdk::Vec<ContributorPoints>,
+        wave_reward_pool: i128,
+    ) {
+        let mut total_points: i128 = 0;
+        for item in contributor_points.iter() {
+            total_points += item.points;
+        }
+
+        if total_points == 0 {
+            panic!("Total points cannot be zero");
+        }
+
+        let escrow_key = symbol_short!("escrow");
+        let escrow_address: Address = env.storage().instance().get::<_, Address>(&escrow_key).unwrap();
+
+        let mut sum_rewards: i128 = 0;
+        let contributor_count = contributor_points.len();
+
+        for item in contributor_points.iter() {
+            let contributor = item.address;
+            let points = item.points;
+            
+            // contributor_reward = (contributor_points / total_points) * wave_reward_pool
+            // reward = (points * wave_reward_pool) / total_points
+            let reward = points
+                .checked_mul(wave_reward_pool)
+                .unwrap()
+                .checked_div(total_points)
+                .unwrap();
+            
+            if reward > 0 {
+                sum_rewards += reward;
+                
+                // Call escrow.release(wave_id, contributor, reward)
+                env.invoke_contract::<()>(
+                    &escrow_address,
+                    symbol_short!("release"),
+                    (wave_id.clone(), contributor, reward).into_val(&env),
+                );
+            }
+        }
+
+        // Emit Settled(wave_id, total_points, contributor_count)
+        env.events().publish(
+            (symbol_short!("Settled"), wave_id),
+            (total_points, contributor_count),
+        );
     }
 }
 
