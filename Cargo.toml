@@ -1,5 +1,23 @@
 [workspace]
 resolver = "2"
 members = [
-    "contracts/*",
+    "contracts/registry",
+    "contracts/escrow",
+    "contracts/settlement",
 ]
+
+[workspace.dependencies]
+soroban-sdk = "20.0.0"
+soroban-sdk-macros = "20.0.0"
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "debuginfo"
+lto = true
+codegen-units = 1
+
+[profile.release.package."*"]
+opt-level = "z"
+strip = true

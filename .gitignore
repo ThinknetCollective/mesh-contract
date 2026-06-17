@@ -1,11 +1,15 @@
 # Dependencies
 node_modules/
+Cargo.lock
 
 # Build artifacts
 artifacts/
 cache/
 typechain/
 typechain-types/
+target/
+*.wasm
+*.d
 
 # Coverage
 coverage/
@@ -15,9 +19,13 @@ coverage.json
 .env
 .env.local
 .env.*.local
+.env.testnet
 
 # Hardhat
 .hardhat/
+
+# Rust
+Cargo.lock
 
 # IDE
 .idea/
