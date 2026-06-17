@@ -8,6 +8,11 @@ cache/
 typechain/
 typechain-types/
 target/
+Cargo.lock
+
+# Soroban
+.deploy/
+*.wasm
 *.wasm
 *.d
 

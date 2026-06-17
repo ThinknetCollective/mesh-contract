@@ -3,6 +3,8 @@
 **Smart contracts powering the ThinkMesh protocol — on-chain reputation, rewards, and governance.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/Rust-1.70+-orange)](https://www.rust-lang.org/)
+[![Soroban](https://img.shields.io/badge/Soroban-20.0.0-purple)](https://soroban.stellar.org/)
 [![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange)](https://www.rust-lang.org/)
 [![Soroban](https://img.shields.io/badge/Soroban-20.0.0-blue)](https://soroban.stellar.org/)
 [![Stellar](https://img.shields.io/badge/Stellar-Testnet-7C3AED)](https://stellar.org/)
@@ -64,6 +66,14 @@ Your contribution via [Drips](https://www.drips.network/) streams directly to th
 ```
 contracts/
 ├── registry/
+│   └── src/lib.rs             # Wave Program registration contract
+├── escrow/
+│   └── src/lib.rs             # Wave funding escrow contract
+├── settlement/
+│   └── src/lib.rs             # Wave completion settlement contract
+scripts/
+├── deploy.sh                  # Stellar testnet deployment script
+└── seed_testnet.sh            # Testnet seeding script
 │   └── src/lib.rs            # Wave Program registration contract
 ├── escrow/
 │   └── src/lib.rs            # Wave escrow for fund management
@@ -81,6 +91,9 @@ scripts/
 ### Prerequisites
 
 - Rust >= 1.70.0
+- Stellar CLI (soroban-cli)
+- Stellar SDK
+- A wallet with Stellar testnet XLM (funded via Friendbot)
 - Soroban CLI (install via `cargo install soroban-cli`)
 - Stellar testnet account (get funded via [Friendbot](https://friendbot.stellar.org))
 
@@ -88,11 +101,40 @@ scripts/
 
 ```bash
 # Clone the repo
-git clone https://github.com/ThinknetCollective/mesh-contract.git
+git clone https://github.com/frankosakwe/mesh-contract.git
 cd mesh-contract
 
 # Install Rust toolchain for Soroban
 rustup target add wasm32-unknown-unknown
+
+# Install Stellar CLI
+cargo install soroban-cli
+
+# Build contracts
+cargo build --target wasm32-unknown-unknown --release
+
+# Deploy to Stellar testnet (Linux/Mac/WSL)
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh
+
+# Seed testnet with sample data (Linux/Mac/WSL)
+chmod +x scripts/seed_testnet.sh
+./scripts/seed_testnet.sh
+```
+
+#### Windows Users
+
+For Windows users, PowerShell scripts are also provided:
+
+```powershell
+# Deploy to Stellar testnet (PowerShell)
+.\scripts\deploy.ps1
+
+# Seed testnet with sample data (PowerShell)
+.\scripts\seed_testnet.ps1
+```
+
+**Note:** Windows users experiencing build issues should use WSL (Windows Subsystem for Linux) or see [BUILD_ISSUES.md](BUILD_ISSUES.md) for workarounds.
 cargo install soroban-cli
 
 # Copy environment variables
@@ -125,7 +167,16 @@ cargo test
 
 ### Environment Variables
 
+After deployment, contract IDs are automatically saved to `.env.testnet`:
+
 ```bash
+# .env.testnet (auto-generated)
+NETWORK=testnet
+RPC_URL=https://soroban-testnet.stellar.org:443
+DEPLOYER_ADDRESS=your_deployer_address
+REGISTRY_CONTRACT_ID=deployed_registry_contract_id
+ESCROW_CONTRACT_ID=deployed_escrow_contract_id
+SETTLEMENT_CONTRACT_ID=deployed_settlement_contract_id
 # .env.testnet
 DEPLOYER_SECRET_KEY=your_stellar_secret_key
 STELLAR_NETWORK=testnet
@@ -138,6 +189,11 @@ STELLAR_RPC_URL=https://soroban-testnet.stellar.org:443
 
 | Contract | Network | Address |
 |---|---|---|
+| Registry | Stellar Testnet | Deployed via `scripts/deploy.sh` |
+| Escrow | Stellar Testnet | Deployed via `scripts/deploy.sh` |
+| Settlement | Stellar Testnet | Deployed via `scripts/deploy.sh` |
+
+> Contract IDs are saved to `.env.testnet` after deployment.
 | Registry | Stellar Testnet | Run `./scripts/deploy.sh` to deploy |
 | Escrow | Stellar Testnet | Run `./scripts/deploy.sh` to deploy |
 | Settlement | Stellar Testnet | Run `./scripts/deploy.sh` to deploy |
@@ -151,6 +207,21 @@ STELLAR_RPC_URL=https://soroban-testnet.stellar.org:443
 | Layer | Technology |
 |---|---|
 | Smart contracts | Rust + Soroban SDK |
+| Framework | Soroban CLI |
+| Network | Stellar Testnet |
+| Contract types | Registry, Escrow, Settlement |
+| Deployment | Stellar CLI (soroban contract deploy) |
+| Funding | Stellar Friendbot |
+
+### Why Stellar (Soroban)?
+
+| Feature | Stellar Soroban | Ethereum L1 |
+|---|---|---|
+| Gas fee | ~$0.0001 | ~$2–50 |
+| Speed | ~5 seconds | ~12 seconds |
+| Security | ✅ Stellar SCP | ✅ Native |
+| Developer UX | ✅ Rust-based | ✅ EVM |
+| Accessibility | ✅ Low cost for all | ❌ Expensive for small users |
 | Framework | Soroban 20.0.0 |
 | Testing | Soroban SDK testutils |
 | Network | Stellar (Soroban) |
@@ -172,6 +243,15 @@ STELLAR_RPC_URL=https://soroban-testnet.stellar.org:443
 
 ### ✅ Phase 1: Foundation (Q1 2026)
 - [x] Repository setup & architecture design
+- [x] Registry contract (Wave Program registration)
+- [x] Escrow contract (Wave funding escrow)
+- [x] Settlement contract (Wave completion settlement)
+- [x] Testnet deployment scripts
+- [x] Testnet seeding scripts
+
+### 🚧 Phase 2: Testing & Integration (Q2 2026)
+- [ ] Comprehensive contract tests
+- [ ] Integration tests
 - [x] Soroban contract development
 - [x] Testnet deployment scripts
 - [ ] Comprehensive test coverage
@@ -182,16 +262,16 @@ STELLAR_RPC_URL=https://soroban-testnet.stellar.org:443
 - [ ] MeshDAO voting contracts
 - [ ] Timelock controller
 - [ ] Security audit
-
-### 📋 Phase 3: Bounties & Rewards (Q3 2026)
-- [ ] BountyEscrow contract
-- [ ] Drips streaming integration
 - [ ] Mainnet deployment
+
+### 📋 Phase 3: Advanced Features (Q3 2026)
+- [ ] Token integration
+- [ ] Advanced governance features
 - [ ] Frontend integration with thinkmesh-api
+- [ ] Drips streaming integration
 
 ### 🌟 Phase 4: Ecosystem (Q4 2026)
 - [ ] Cross-chain bridges
-- [ ] DAO-managed upgrade proxies
 - [ ] Partner integrations
 - [ ] Grant program smart contracts
 
@@ -202,6 +282,14 @@ STELLAR_RPC_URL=https://soroban-testnet.stellar.org:443
 ```bash
 # Run all tests
 cargo test
+
+# Run tests with output
+cargo test -- --nocapture
+
+# Run specific contract tests
+cargo test -p registry
+cargo test -p escrow
+cargo test -p settlement
 
 # Run tests with output
 cargo test -- --nocapture
