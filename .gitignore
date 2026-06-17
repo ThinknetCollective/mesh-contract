@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+Cargo.lock
 
 # Build artifacts
 artifacts/
@@ -12,6 +13,8 @@ Cargo.lock
 # Soroban
 .deploy/
 *.wasm
+*.wasm
+*.d
 
 # Coverage
 coverage/
@@ -25,6 +28,9 @@ coverage.json
 
 # Hardhat
 .hardhat/
+
+# Rust
+Cargo.lock
 
 # IDE
 .idea/
@@ -44,3 +50,7 @@ dist/
 
 # Misc
 *.tgz
+
+# Rust / Cargo
+target/
+Cargo.lock
