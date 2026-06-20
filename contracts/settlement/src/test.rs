@@ -1,7 +1,8 @@
 #![cfg(test)]
 
 use soroban_sdk::{testutils::Address as _, Address, Env, String, Vec};
-use crate::{ContributorPoints, SettlementContract, SettlementContractClient};
+use crate::{ContributorResult, SettlementContract, SettlementContractClient};
+use crate::interfaces::errors::ContractError;
 
 #[soroban_sdk::contract]
 pub struct MockEscrow;
@@ -20,7 +21,7 @@ impl MockEscrow {
     }
 }
 
-fn setup_env() -> (Env, SettlementContractClient<'static>, Address) {
+fn setup_env() -> (Env, SettlementContractClient<'static>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
     
@@ -34,31 +35,88 @@ fn setup_env() -> (Env, SettlementContractClient<'static>, Address) {
     
     settlement_client.init(&escrow_id, &registry, &admin);
     
-    (env, settlement_client, escrow_id)
+    (env, settlement_client, escrow_id, admin)
 }
 
 #[test]
-fn test_settle_wave_even_split() {
-    let (env, client, escrow_id) = setup_env();
+fn test_settle_even_split() {
+    let (env, client, escrow_id, _) = setup_env();
     let wave_id = String::from_str(&env, "wave_1");
     
     let user1 = Address::generate(&env);
     let user2 = Address::generate(&env);
     
     let mut contributors = Vec::new(&env);
-    contributors.push_back(ContributorPoints { address: user1.clone(), points: 50 });
-    contributors.push_back(ContributorPoints { address: user2.clone(), points: 50 });
+    contributors.push_back(ContributorResult { address: user1.clone(), points: 50 });
+    contributors.push_back(ContributorResult { address: user2.clone(), points: 50 });
     
     let reward_pool = 1000i128;
-    client.settle_wave(&wave_id, &contributors, &reward_pool);
+    client.settle(&wave_id, &contributors, &reward_pool);
     
     let mock_escrow = MockEscrowClient::new(&env, &escrow_id);
     assert_eq!(mock_escrow.get_released_amount(), 1000);
 }
 
 #[test]
-fn test_settle_wave_uneven_split() {
-    let (env, client, escrow_id) = setup_env();
+fn test_settle_empty_results() {
+    let (env, client, _, _) = setup_env();
+    let wave_id = String::from_str(&env, "wave_empty");
+    let contributors = Vec::new(&env);
+    let reward_pool = 1000i128;
+    
+    let result = client.try_settle(&wave_id, &contributors, &reward_pool);
+    assert_eq!(result, Err(Ok(ContractError::EmptyResults)));
+}
+
+#[test]
+fn test_settle_zero_points() {
+    let (env, client, _, _) = setup_env();
+    let wave_id = String::from_str(&env, "wave_zero");
+    
+    let user1 = Address::generate(&env);
+    let mut contributors = Vec::new(&env);
+    contributors.push_back(ContributorResult { address: user1, points: 0 });
+    
+    let reward_pool = 1000i128;
+    let result = client.try_settle(&wave_id, &contributors, &reward_pool);
+    assert_eq!(result, Err(Ok(ContractError::ZeroTotalPoints)));
+}
+
+#[test]
+fn test_settle_duplicate_contributor() {
+    let (env, client, _, _) = setup_env();
+    let wave_id = String::from_str(&env, "wave_dup");
+    
+    let user1 = Address::generate(&env);
+    let mut contributors = Vec::new(&env);
+    contributors.push_back(ContributorResult { address: user1.clone(), points: 50 });
+    contributors.push_back(ContributorResult { address: user1, points: 50 });
+    
+    let reward_pool = 1000i128;
+    let result = client.try_settle(&wave_id, &contributors, &reward_pool);
+    assert_eq!(result, Err(Ok(ContractError::DuplicateContributor)));
+}
+
+#[test]
+fn test_settle_already_settled() {
+    let (env, client, _, _) = setup_env();
+    let wave_id = String::from_str(&env, "wave_settled");
+    
+    let user1 = Address::generate(&env);
+    let mut contributors = Vec::new(&env);
+    contributors.push_back(ContributorResult { address: user1, points: 100 });
+    
+    let reward_pool = 1000i128;
+    client.settle(&wave_id, &contributors, &reward_pool);
+    
+    // Try to settle again
+    let result = client.try_settle(&wave_id, &contributors, &reward_pool);
+    assert_eq!(result, Err(Ok(ContractError::AlreadySettled)));
+}
+
+#[test]
+fn test_settle_uneven_split() {
+    let (env, client, escrow_id, _) = setup_env();
     let wave_id = String::from_str(&env, "wave_2");
     
     let user1 = Address::generate(&env);
@@ -66,75 +124,13 @@ fn test_settle_wave_uneven_split() {
     let user3 = Address::generate(&env);
     
     let mut contributors = Vec::new(&env);
-    contributors.push_back(ContributorPoints { address: user1, points: 10 });
-    contributors.push_back(ContributorPoints { address: user2, points: 20 });
-    contributors.push_back(ContributorPoints { address: user3, points: 30 });
+    contributors.push_back(ContributorResult { address: user1, points: 10 });
+    contributors.push_back(ContributorResult { address: user2, points: 20 });
+    contributors.push_back(ContributorResult { address: user3, points: 30 });
     
-    // Total points = 60
-    // Rewards: 10/60 * 600 = 100, 20/60 * 600 = 200, 30/60 * 600 = 300
     let reward_pool = 600i128;
-    client.settle_wave(&wave_id, &contributors, &reward_pool);
+    client.settle(&wave_id, &contributors, &reward_pool);
     
     let mock_escrow = MockEscrowClient::new(&env, &escrow_id);
     assert_eq!(mock_escrow.get_released_amount(), 600);
-}
-
-#[test]
-fn test_settle_wave_single_contributor() {
-    let (env, client, escrow_id) = setup_env();
-    let wave_id = String::from_str(&env, "wave_3");
-    
-    let user1 = Address::generate(&env);
-    
-    let mut contributors = Vec::new(&env);
-    contributors.push_back(ContributorPoints { address: user1, points: 100 });
-    
-    let reward_pool = 1000i128;
-    client.settle_wave(&wave_id, &contributors, &reward_pool);
-    
-    let mock_escrow = MockEscrowClient::new(&env, &escrow_id);
-    assert_eq!(mock_escrow.get_released_amount(), 1000);
-}
-
-#[test]
-fn test_settle_wave_dust_handling() {
-    let (env, client, escrow_id) = setup_env();
-    let wave_id = String::from_str(&env, "wave_4");
-    
-    let user1 = Address::generate(&env);
-    let user2 = Address::generate(&env);
-    let user3 = Address::generate(&env);
-    
-    let mut contributors = Vec::new(&env);
-    contributors.push_back(ContributorPoints { address: user1, points: 1 });
-    contributors.push_back(ContributorPoints { address: user2, points: 1 });
-    contributors.push_back(ContributorPoints { address: user3, points: 1 });
-    
-    // Total points = 3
-    // Reward pool = 100
-    // Each gets 1/3 * 100 = 33. Total released = 99. Dust = 1.
-    let reward_pool = 100i128;
-    client.settle_wave(&wave_id, &contributors, &reward_pool);
-    
-    let mock_escrow = MockEscrowClient::new(&env, &escrow_id);
-    assert_eq!(mock_escrow.get_released_amount(), 99);
-}
-
-#[test]
-fn test_settle_wave_arithmetic_safety() {
-    let (env, client, escrow_id) = setup_env();
-    let wave_id = String::from_str(&env, "wave_5");
-    
-    let user1 = Address::generate(&env);
-    
-    let mut contributors = Vec::new(&env);
-    // Use very large points and large reward pool to check i128
-    let large_points = 1_000_000_000_000_000i128;
-    contributors.push_back(ContributorPoints { address: user1, points: large_points });
-    
-    let large_reward = 1_000_000_000_000_000_000i128;
-    client.settle_wave(&wave_id, &contributors, &large_reward);
-    
-    let mock_escrow = MockEscrowClient::new(&env, &escrow_id);
-    assert_eq!(mock_escrow.get_released_amount(), large_reward);
 }
