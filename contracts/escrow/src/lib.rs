@@ -1,5 +1,6 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Map, String};
+mod interfaces;
 
 #[contract]
 pub struct EscrowContract;
@@ -111,6 +112,81 @@ impl EscrowContract {
     pub fn get_wave_count(env: Env) -> u32 {
         let count_key = symbol_short!("wave_cnt");
         env.storage().instance().get(&count_key).unwrap_or(0u32)
+    }
+
+    /// Fund a program vault with tokens
+    /// 
+    /// # Arguments
+    /// * `program_id` - The unique identifier of the Wave program
+    /// * `token` - The token contract address to deposit
+    /// * `amount` - The amount of tokens to deposit
+    /// 
+    /// # Reverts
+    /// * If caller is not authorized (not the program organizer)
+    /// * If amount is zero
+    /// * If token transfer fails
+    /// 
+    /// # Emits
+    /// * Funded(program_id, amount) event on success
+    pub fn fund(env: Env, program_id: u64, token: Address, amount: i128) {
+        // Validate amount
+        if amount <= 0 {
+            panic!("Amount must be greater than zero");
+        }
+
+        // Authorization check: caller must be the program organizer
+        // For now, we'll use the admin as the authorized funder
+        // In production, this should check against the program's organizer
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("admin"))
+            .expect("not initialized");
+        admin.require_auth();
+
+        // Get or create program vault storage
+        let balances_key = symbol_short!("program_balances");
+        let mut balances: Map<u64, (Address, i128)> = env
+            .storage()
+            .instance()
+            .get(&balances_key)
+            .unwrap_or_else(|| Map::new(&env));
+
+        // Get current balance for this program
+        let current_balance = balances.get(program_id).unwrap_or((token.clone(), 0i128));
+
+        // Verify token matches if program already has funds
+        if current_balance.0 != token && current_balance.1 > 0 {
+            panic!("Token mismatch: program already funded with different token");
+        }
+
+        // Update balance
+        let new_balance = current_balance.1 + amount;
+        balances.set(program_id, (token.clone(), new_balance));
+
+        // Store updated balances
+        env.storage().instance().set(&balances_key, &balances);
+
+        // TODO: Implement SEP-41 token transfer from caller to escrow
+        // This requires calling the token contract's transfer function
+        // For now, we'll skip the actual transfer and just track the balance
+
+        // Emit Funded event
+        env.events().publish(
+            (symbol_short!("Funded"), program_id),
+            (token, amount),
+        );
+    }
+
+    /// Get program vault balance
+    pub fn get_program_balance(env: Env, program_id: u64) -> Option<(Address, i128)> {
+        let balances_key = symbol_short!("program_balances");
+        let balances: Map<u64, (Address, i128)> = env
+            .storage()
+            .instance()
+            .get(&balances_key)
+            .unwrap_or_else(|| Map::new(&env));
+        balances.get(program_id)
     }
 
     /// Release funds from a Wave escrow to a recipient
