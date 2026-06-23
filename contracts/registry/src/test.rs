@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{testutils::{Address as _, Ledger}, Address, Env, Symbol};
+use soroban_sdk::{testutils::Address as _, Address, Env};
 
 fn setup(env: &Env) -> (RegistryContractClient<'static>, Address, Address) {
     let contract_id = env.register_contract(None, RegistryContract);
@@ -68,6 +68,34 @@ fn test_wave_lifecycle() {
     let wave = client.get_wave(&wave_id).unwrap();
     assert_eq!(wave.status, WaveStatus::Closed);
     assert_eq!(wave.total_points, 1000);
+
+    // Test 3: Attempt to close internal/non-existent (should fail)
+    // Handled by return Result, so we check for error
+    let result = client.try_close_wave(&wave_id, &1000);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_one_open_wave_per_program() {
+    let env = Env::default();
+    let (client, _admin, _settlement) = setup(&env);
+    
+    let program_id = 1u64;
+    client.register_program(&program_id, &symbol_short!("test"), &Address::generate(&env));
+    
+    // Open first wave
+    client.open_wave(&program_id);
+    
+    // Attempt to open second wave (should fail)
+    let result = client.try_open_wave(&program_id);
+    assert!(result.is_err());
+    
+    // Close first wave
+    client.close_wave(&1, &1000);
+    
+    // Now opening a second wave should work
+    let wave_id_2 = client.open_wave(&program_id);
+    assert_eq!(wave_id_2, 2);
 }
 
 #[test]

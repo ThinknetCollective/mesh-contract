@@ -1,7 +1,7 @@
 #![no_std]
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, 
-    Address, Env, Map, String, Symbol, Vec,
+    Address, Env, Map, Symbol, Vec,
 };
 
 mod test;
@@ -18,6 +18,7 @@ pub enum Error {
     NotInitialized = 6,
     Unauthorized = 7,
     ProgramAlreadyExists = 8,
+    WaveAlreadyOpen = 9,
 }
 
 // --- Data structures ---
@@ -66,6 +67,7 @@ pub enum DataKey {
     Programs,                    // Map<u64, ProgramMeta>
     Waves,                       // Map<u64, WaveMeta>
     WaveCounter,                 // u64
+    ProgramActiveWave(u64),      // program_id -> wave_id
     Contributions(Address, u64), // (contributor, wave_id) -> WaveContribution
     History(Address),            // contributor -> Vec<u64> (wave IDs)
 }
@@ -115,6 +117,12 @@ impl RegistryContract {
             return Err(Error::ProgramNotFound);
         }
 
+        // Check if there is already an active wave for this program
+        let active_key = DataKey::ProgramActiveWave(program_id);
+        if env.storage().instance().has(&active_key) {
+            return Err(Error::WaveAlreadyOpen);
+        }
+
         let mut wave_counter: u64 = env.storage().instance().get(&DataKey::WaveCounter).unwrap_or(0);
         wave_counter += 1;
         let wave_id = wave_counter;
@@ -132,8 +140,11 @@ impl RegistryContract {
         let mut waves: Map<u64, WaveMeta> = env.storage().instance().get(&DataKey::Waves).unwrap_or(Map::new(&env));
         waves.set(wave_id, wave);
         env.storage().instance().set(&DataKey::Waves, &waves);
+        
+        // Track as active wave for the program
+        env.storage().instance().set(&active_key, &wave_id);
 
-        env.events().publish((symbol_short!("wv_open"), program_id), (wave_id, env.ledger().timestamp()));
+        env.events().publish((Symbol::new(&env, "WaveOpened"), program_id), (wave_id, env.ledger().timestamp()));
 
         Ok(wave_id)
     }
@@ -154,7 +165,10 @@ impl RegistryContract {
         waves.set(wave_id, wave.clone());
         env.storage().instance().set(&DataKey::Waves, &waves);
 
-        env.events().publish((symbol_short!("wv_close"), wave.program_id), (wave_id, env.ledger().timestamp(), total_points));
+        // Clear active wave for the program
+        env.storage().instance().remove(&DataKey::ProgramActiveWave(wave.program_id));
+
+        env.events().publish((Symbol::new(&env, "WaveClosed"), wave.program_id), (wave_id, env.ledger().timestamp(), total_points));
         Ok(())
     }
 
