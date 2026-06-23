@@ -1,64 +1,92 @@
 #![cfg(test)]
 
-use soroban_sdk::{Address, Env, String};
+use super::*;
+use soroban_sdk::{testutils::{Address as _, Ledger}, Address, Env, Symbol};
 
-#[test]
-fn test_registry_init() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, registry::RegistryContract);
-    let client = registry::RegistryContractClient::new(&env, &contract_id);
-
-    let admin = Address::generate(&env);
-    client.init(&admin);
-
-    let program_count = client.get_program_count();
-    assert_eq!(program_count, 0);
+fn setup(env: &Env) -> (RegistryContractClient<'static>, Address, Address) {
+    let contract_id = env.register_contract(None, RegistryContract);
+    let client = RegistryContractClient::new(env, &contract_id);
+    
+    let admin = Address::generate(env);
+    let settlement = Address::generate(env);
+    
+    client.initialize(&admin, &settlement);
+    (client, admin, settlement)
 }
 
 #[test]
-fn test_register_program() {
+fn test_initialize_and_getters() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, registry::RegistryContract);
-    let client = registry::RegistryContractClient::new(&env, &contract_id);
-
-    let admin = Address::generate(&env);
-    client.init(&admin);
-
-    let program_id = String::from_str(&env, "test_program");
-    let name = String::from_str(&env, "Test Program");
-    let description = String::from_str(&env, "A test program");
-    let creator = Address::generate(&env);
-    let escrow_contract = Address::generate(&env);
-
-    client.register_program(&program_id, &name, &description, &creator, &escrow_contract);
-
-    let program_count = client.get_program_count();
-    assert_eq!(program_count, 1);
-
-    let program = client.get_program(&program_id);
-    assert!(program.is_some());
+    let (client, admin, settlement) = setup(&env);
+    
+    assert_eq!(client.get_admin(), admin);
+    assert_eq!(client.get_settlement(), settlement);
 }
 
 #[test]
-fn test_get_program() {
+#[should_panic(expected = "Already initialized")]
+fn test_double_initialize_fails() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, registry::RegistryContract);
-    let client = registry::RegistryContractClient::new(&env, &contract_id);
+    let (client, admin, settlement) = setup(&env);
+    client.initialize(&admin, &settlement);
+}
 
-    let admin = Address::generate(&env);
-    client.init(&admin);
-
-    let program_id = String::from_str(&env, "test_program");
-    let name = String::from_str(&env, "Test Program");
-    let description = String::from_str(&env, "A test program");
+#[test]
+fn test_register_and_get_program() {
+    let env = Env::default();
+    let (client, _admin, _settlement) = setup(&env);
+    
+    let program_id = 1u64;
+    let name = symbol_short!("test");
     let creator = Address::generate(&env);
-    let escrow_contract = Address::generate(&env);
+    
+    client.register_program(&program_id, &name, &creator);
+    
+    let program = client.get_program(&program_id).unwrap();
+    assert_eq!(program.program_id, program_id);
+    assert_eq!(program.name, name);
+    assert_eq!(program.admin, creator);
+}
 
-    client.register_program(&program_id, &name, &description, &creator, &escrow_contract);
+#[test]
+fn test_wave_lifecycle() {
+    let env = Env::default();
+    let (client, _admin, _settlement) = setup(&env);
+    
+    let program_id = 1u64;
+    client.register_program(&program_id, &symbol_short!("test"), &Address::generate(&env));
+    
+    // Open wave
+    let wave_id = client.open_wave(&program_id);
+    assert_eq!(wave_id, 1);
+    
+    let wave = client.get_wave(&wave_id).unwrap();
+    assert_eq!(wave.status, WaveStatus::Open);
+    
+    // Close wave
+    client.close_wave(&wave_id, &1000);
+    let wave = client.get_wave(&wave_id).unwrap();
+    assert_eq!(wave.status, WaveStatus::Closed);
+    assert_eq!(wave.total_points, 1000);
+}
 
-    let program = client.get_program(&program_id);
-    assert!(program.is_some());
-
-    let non_existent = client.get_program(&String::from_str(&env, "non_existent"));
-    assert!(non_existent.is_none());
+#[test]
+fn test_contribution_workflow() {
+    let env = Env::default();
+    env.mock_all_auths();
+    
+    let (client, _admin, settlement) = setup(&env);
+    
+    let program_id = 1u64;
+    client.register_program(&program_id, &symbol_short!("test"), &Address::generate(&env));
+    let wave_id = client.open_wave(&program_id);
+    
+    let contributor = Address::generate(&env);
+    
+    // Record contribution
+    client.record_contribution(&wave_id, &contributor, &100);
+    
+    let history = client.contributor_record(&contributor);
+    assert_eq!(history.len(), 1);
+    assert_eq!(history.get(0).unwrap().points, 100);
 }
