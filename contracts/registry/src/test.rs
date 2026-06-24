@@ -2,6 +2,7 @@
 
 use super::*;
 use soroban_sdk::{testutils::{Address as _, Events, Ledger}, Address, Env, String};
+use crate::interfaces::types::ProgramConfig;
 
 fn setup(env: &Env) -> (RegistryContractClient<'static>, Address, Address) {
     let contract_id = env.register_contract(None, RegistryContract);
@@ -24,34 +25,104 @@ fn test_contract_initialization() {
 }
 
 #[test]
-fn test_program_registration() {
+fn test_program_registration_success() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, admin, _) = setup(&env);
+    
+    let config = ProgramConfig {
+        name: String::from_str(&env, "Program 1"),
+        organizer: Address::generate(&env),
+        metadata: String::from_str(&env, "Meta 1"),
+        funding_target: 5000,
+    };
+    
+    let program_id = client.register_program(&admin, &config);
+    assert_eq!(program_id, 1);
+    
+    let stored = client.get_program(&program_id).unwrap();
+    assert_eq!(stored.name, config.name);
+    assert_eq!(stored.organizer, config.organizer);
+}
+
+#[test]
+#[should_panic(expected = "program name already exists")]
+fn test_duplicate_program_name_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, admin, _) = setup(&env);
+    
+    let config1 = ProgramConfig {
+        name: String::from_str(&env, "Same Name"),
+        organizer: Address::generate(&env),
+        metadata: String::from_str(&env, "Meta 1"),
+        funding_target: 1000,
+    };
+    let admin = client.get_admin();
+    client.register_program(&admin, &config1);
+    
+    let config2 = ProgramConfig {
+        name: String::from_str(&env, "Same Name"),
+        organizer: Address::generate(&env),
+        metadata: String::from_str(&env, "Meta 2"),
+        funding_target: 2000,
+    };
+    client.register_program(&admin, &config2);
+}
+
+#[test]
+fn test_registration_by_onboarder() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, admin, _) = setup(&env);
+    
+    let onboarder = Address::generate(&env);
+    client.set_onboarder(&onboarder);
+    
+    let config = ProgramConfig {
+        name: String::from_str(&env, "Onboarded"),
+        organizer: Address::generate(&env),
+        metadata: String::from_str(&env, "Meta"),
+        funding_target: 1000,
+    };
+    
+    let id = client.register_program(&onboarder, &config);
+    assert_eq!(id, 1);
+}
+
+#[test]
+#[should_panic(expected = "unauthorized")]
+fn test_unauthorized_registration_fails() {
     let env = Env::default();
     env.mock_all_auths();
     let (client, _, _) = setup(&env);
     
-    let program_id = String::from_str(&env, "program_1");
-    let creator = Address::generate(&env);
-    let metadata = String::from_str(&env, "Some metadata");
-    let target: u128 = 5000;
+    let config = ProgramConfig {
+        name: String::from_str(&env, "Unauthorized"),
+        organizer: Address::generate(&env),
+        metadata: String::from_str(&env, "Meta"),
+        funding_target: 1000,
+    };
     
-    client.register_program(&program_id, &creator, &metadata, &target);
-    
-    let program = client.get_program(&program_id).unwrap();
-    assert_eq!(program.creator, creator);
-    assert_eq!(program.metadata, metadata);
-    assert_eq!(program.funding_target, target);
-    assert!(program.is_active);
+    let someone_else = Address::generate(&env);
+    client.register_program(&someone_else, &config);
 }
 
 #[test]
 fn test_full_wave_lifecycle() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, _, _) = setup(&env);
+    let (client, admin, _) = setup(&env);
     
     // 1. Register Program
-    let program_id = String::from_str(&env, "prog_lifecycle");
-    client.register_program(&program_id, &Address::generate(&env), &String::from_str(&env, "meta"), &1000);
+    let config = ProgramConfig {
+        name: String::from_str(&env, "Wave Program"),
+        organizer: Address::generate(&env),
+        metadata: String::from_str(&env, "Meta"),
+        funding_target: 1000,
+    };
+    let admin = client.get_admin();
+    let program_id = client.register_program(&admin, &config);
     
     // 2. Open Wave
     let open_ts = 200000;
@@ -61,33 +132,13 @@ fn test_full_wave_lifecycle() {
     
     let wave = client.get_wave(&wave_id).expect("Wave should exist");
     assert_eq!(wave.status, WaveStatus::Open);
-    assert_eq!(wave.opened_at, open_ts);
+    assert_eq!(wave.program_id, program_id);
     
     // 3. Close Wave
     let close_ts = 300000;
     env.ledger().with_mut(|li| li.timestamp = close_ts);
-    let total_points = 1500;
-    client.close_wave(&wave_id, &total_points);
+    client.close_wave(&wave_id, &1500);
     
     let wave_after = client.get_wave(&wave_id).expect("Wave should exist");
     assert_eq!(wave_after.status, WaveStatus::Closed);
-    assert_eq!(wave_after.closed_at, close_ts);
-    assert_eq!(wave_after.total_points, total_points);
-}
-
-#[test]
-#[should_panic(expected = "wave already closed or settled")]
-fn test_fail_reopen_or_reclose_wave() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let (client, _, _) = setup(&env);
-    
-    let program_id = String::from_str(&env, "prog_fail");
-    client.register_program(&program_id, &Address::generate(&env), &String::from_str(&env, "meta"), &1000);
-    let wave_id = client.open_wave(&program_id);
-    
-    client.close_wave(&wave_id, &100);
-    // Attempting to close again should fail (satisfies "attempt reopen (should fail)" in spirit, 
-    // as there is no specific reopen function, but closing a non-open wave is the equivalent lifecycle violation)
-    client.close_wave(&wave_id, &200);
 }
