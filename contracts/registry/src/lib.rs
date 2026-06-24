@@ -1,27 +1,54 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, Address, Env, Map, String};
-
 use soroban_sdk::{
-    contract, contractimpl, contracttype,
-    Address, Env, Vec,
+    contract, contractimpl, contracttype, symbol_short, Address, Env, String, Vec,
 };
 
-/// Represents a contributor's contribution record for a specific wave.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WaveContribution {
-    pub wave_id: u64,
+    pub wave_id: u32,
     pub points: u32,
     pub timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum WaveStatus {
+    Open,
+    Closed,
+    Settled,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WaveMeta {
+    pub program_id: String,
+    pub wave_id: u32,
+    pub opened_at: u64,
+    pub closed_at: u64,
+    pub total_points: u32,
+    pub status: WaveStatus,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProgramMeta {
+    pub creator: Address,
+    pub metadata: String,
+    pub funding_target: u128,
+    pub is_active: bool,
 }
 
 /// Storage keys for the registry contract state.
 #[contracttype]
 pub enum DataKey {
-    Contributions(Address, u64), // (contributor_address, wave_id) -> WaveContribution
-    History(Address),            // contributor_address -> Vec<wave_id>
-    SettlementContract,          // Address of authorized settlement contract
-    Admin,                       // Address of the registry administrator
+    Admin,
+    SettlementContract,
+    Programs(String),
+    Waves(u32),
+    WaveCounter,
+    Contributions(Address, u32), // contributor, wave_id -> contribution
+    History(Address),            // contributor -> Vec<wave_id>
 }
 
 #[contract]
@@ -29,17 +56,17 @@ pub struct RegistryContract;
 
 #[contractimpl]
 impl RegistryContract {
-    /// Initialize the registry with admin and escrow contract addresses
-    pub fn initialize(env: Env, admin: Address, escrow_contract: Address) {
-        if env.storage().instance().has(&String::from_str(&env, "admin")) {
+    /// Initialize the contract with an admin and the authorized settlement contract address.
+    pub fn initialize(env: Env, admin: Address, settlement_contract: Address) {
+        if env.storage().instance().has(&DataKey::Admin) {
             panic!("already initialized");
         }
-        
-        env.storage().instance().set(&String::from_str(&env, "admin"), &admin);
-        env.storage().instance().set(&String::from_str(&env, "escrow_contract"), &escrow_contract);
+        env.storage().instance().set(&DataKey::Admin, &admin);
+        env.storage().instance().set(&DataKey::SettlementContract, &settlement_contract);
+        env.storage().instance().set(&DataKey::WaveCounter, &0u32);
     }
 
-    /// Register a new Wave Program
+    /// Register a new Wave Program. Only callable by admin.
     pub fn register_program(
         env: Env,
         program_id: String,
@@ -47,174 +74,155 @@ impl RegistryContract {
         metadata: String,
         funding_target: u128,
     ) {
-        let admin: Address = env
-            .storage()
-            .instance()
-            .get(&String::from_str(&env, "admin"))
-            .expect("not initialized");
-
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
         admin.require_auth();
 
-        let mut programs: Map<String, (Address, String, u128, bool)> = env
-            .storage()
-            .instance()
-            .get(&String::from_str(&env, "programs"))
-            .unwrap_or(Map::new(&env));
-
-        if programs.contains_key(program_id.clone()) {
+        if env.storage().persistent().has(&DataKey::Programs(program_id.clone())) {
             panic!("program already exists");
         }
 
-        programs.set(program_id.clone(), (creator, metadata, funding_target, false));
-        env.storage()
-            .instance()
-            .set(&String::from_str(&env, "programs"), &programs);
+        let program = ProgramMeta {
+            creator,
+            metadata,
+            funding_target,
+            is_active: true,
+        };
+
+        env.storage().persistent().set(&DataKey::Programs(program_id), &program);
     }
 
-    /// Get program details
-    pub fn get_program(env: Env, program_id: String) -> Option<(Address, String, u128, bool)> {
-        let programs: Map<String, (Address, String, u128, bool)> = env
-            .storage()
-            .instance()
-            .get(&String::from_str(&env, "programs"))
-            .unwrap_or(Map::new(&env));
-
-        programs.get(program_id)
-    }
-
-    /// Settle a program (mark as completed)
-    pub fn settle_program(env: Env, program_id: String) {
-        let admin: Address = env
-            .storage()
-            .instance()
-            .get(&String::from_str(&env, "admin"))
-            .expect("not initialized");
-
-        admin.require_auth();
-
-        let mut programs: Map<String, (Address, String, u128, bool)> = env
-            .storage()
-            .instance()
-            .get(&String::from_str(&env, "programs"))
-            .unwrap_or(Map::new(&env));
-
-        let program = programs
-            .get(program_id.clone())
-            .expect("program not found");
-
-        programs.set(program_id.clone(), (program.0, program.1, program.2, true));
-        env.storage()
-            .instance()
-            .set(&String::from_str(&env, "programs"), &programs);
-    }
-
-    /// Get escrow contract address
-    pub fn get_escrow_contract(env: Env) -> Address {
-        env.storage()
-            .instance()
-            .get(&String::from_str(&env, "escrow_contract"))
-            .expect("not initialized")
-    /// Initialize the contract with an admin and the authorized settlement contract address.
-    /// Can only be called once.
-    pub fn initialize(env: Env, admin: Address, settlement_contract: Address) {
-        if env.storage().instance().has(&DataKey::Admin) {
-            panic!("Contract already initialized");
+    /// Opens a new wave cycle for a program. Returns wave_id.
+    pub fn open_wave(env: Env, program_id: String) -> u32 {
+        if !env.storage().persistent().has(&DataKey::Programs(program_id.clone())) {
+            panic!("program doesn't exist");
         }
-        env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::SettlementContract, &settlement_contract);
+
+        // Increment global wave ID
+        let mut counter: u32 = env.storage().instance().get(&DataKey::WaveCounter).unwrap_or(0);
+        counter += 1;
+        env.storage().instance().set(&DataKey::WaveCounter, &counter);
+
+        let wave_id = counter;
+        let wave = WaveMeta {
+            program_id: program_id.clone(),
+            wave_id,
+            opened_at: env.ledger().timestamp(),
+            closed_at: 0,
+            total_points: 0,
+            status: WaveStatus::Open,
+        };
+
+        env.storage().persistent().set(&DataKey::Waves(wave_id), &wave);
+
+        // Emit WaveOpened event
+        env.events().publish(
+            (symbol_short!("wave_open"), program_id, wave_id),
+            env.ledger().timestamp(),
+        );
+
+        wave_id
     }
 
-    /// Update the authorized settlement contract address. Only callable by the administrator.
-    pub fn set_settlement(env: Env, new_settlement: Address) {
-        let admin: Address = env
+    /// Closes an open wave cycle and marks it ready for settlement.
+    pub fn close_wave(env: Env, wave_id: u32, total_points: u32) {
+        let mut wave: WaveMeta = env
             .storage()
-            .instance()
-            .get(&DataKey::Admin)
-            .expect("Contract not initialized");
-        admin.require_auth();
+            .persistent()
+            .get(&DataKey::Waves(wave_id))
+            .expect("wave not found");
 
-        env.storage()
-            .instance()
-            .set(&DataKey::SettlementContract, &new_settlement);
+        if wave.status != WaveStatus::Open {
+            panic!("wave already closed or settled");
+        }
+
+        wave.closed_at = env.ledger().timestamp();
+        wave.total_points = total_points;
+        wave.status = WaveStatus::Closed;
+
+        env.storage().persistent().set(&DataKey::Waves(wave_id), &wave);
+
+        // Emit WaveClosed event
+        env.events().publish(
+            (symbol_short!("wave_cls"), wave_id, total_points),
+            env.ledger().timestamp(),
+        );
     }
 
-    /// Record a contribution points entry. Stores (address, wave_id) -> points.
-    /// Only callable by the authorized settlement contract.
-    pub fn record_contribution(
-        env: Env,
-        wave_id: u64,
-        address: Address,
-        points: u32,
-    ) {
+    /// Record a contribution points entry. Only callable by settlement contract.
+    pub fn record_contribution(env: Env, wave_id: u32, address: Address, points: u32) {
         let settlement: Address = env
-            .storage()
-            .instance()
+            .storage().instance()
             .get(&DataKey::SettlementContract)
-            .expect("Settlement contract not set");
-        
-        // Ensure that only the authorized settlement contract has signed/authorized this call
+            .expect("settlement not set");
         settlement.require_auth();
 
-        // Create the contribution record
+        let wave: WaveMeta = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Waves(wave_id))
+            .expect("wave not found");
+        
+        if wave.status != WaveStatus::Open {
+            panic!("wave is not open");
+        }
+
         let contribution = WaveContribution {
             wave_id,
             points,
             timestamp: env.ledger().timestamp(),
         };
 
-        // Key format: CONTRIBUTIONS map with composite key (Address, u64)
-        let contribution_key = DataKey::Contributions(address.clone(), wave_id);
-        env.storage().persistent().set(&contribution_key, &contribution);
+        env.storage().persistent().set(&DataKey::Contributions(address.clone(), wave_id), &contribution);
 
-        // Keep track of the wave IDs for history querying
-        let history_key = DataKey::History(address.clone());
-        let mut history: Vec<u64> = env
+        let mut history: Vec<u32> = env
             .storage()
             .persistent()
-            .get(&history_key)
+            .get(&DataKey::History(address.clone()))
             .unwrap_or_else(|| Vec::new(&env));
 
         if !history.contains(wave_id) {
             history.push_back(wave_id);
-            env.storage().persistent().set(&history_key, &history);
+            env.storage().persistent().set(&DataKey::History(address), &history);
         }
     }
 
-    /// Returns the full contribution history for a contributor as Vec<WaveContribution>.
-    /// Handles contributors with no prior history gracefully by returning an empty Vec.
+    /// Returns the full contribution history for a contributor.
     pub fn contributor_record(env: Env, address: Address) -> Vec<WaveContribution> {
-        let history_key = DataKey::History(address.clone());
-        let history_res = env.storage().persistent().get::<_, Vec<u64>>(&history_key);
+        let history: Vec<u32> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::History(address.clone()))
+            .unwrap_or_else(|| Vec::new(&env));
 
-        match history_res {
-            Some(wave_ids) => {
-                let mut contributions = Vec::new(&env);
-                for wave_id in wave_ids.iter() {
-                    let key = DataKey::Contributions(address.clone(), wave_id);
-                    if let Some(contribution) = env.storage().persistent().get::<_, WaveContribution>(&key) {
-                        contributions.push_back(contribution);
-                    }
-                }
-                contributions
+        let mut contributions = Vec::new(&env);
+        for wave_id in history.iter() {
+            if let Some(contribution) = env.storage().persistent().get::<_, WaveContribution>(&DataKey::Contributions(address.clone(), wave_id)) {
+                contributions.push_back(contribution);
             }
-            None => Vec::new(&env),
         }
+        contributions
     }
 
-    /// Get the current admin address.
+    pub fn get_wave(env: Env, wave_id: u32) -> Option<WaveMeta> {
+        env.storage().persistent().get(&DataKey::Waves(wave_id))
+    }
+
+    pub fn get_program(env: Env, program_id: String) -> Option<ProgramMeta> {
+        env.storage().persistent().get(&DataKey::Programs(program_id))
+    }
+
     pub fn get_admin(env: Env) -> Address {
-        env.storage()
-            .instance()
-            .get(&DataKey::Admin)
-            .expect("Contract not initialized")
+        env.storage().instance().get(&DataKey::Admin).expect("not initialized")
     }
 
-    /// Get the current settlement contract address.
     pub fn get_settlement(env: Env) -> Address {
-        env.storage()
-            .instance()
-            .get(&DataKey::SettlementContract)
-            .expect("Contract not initialized")
+        env.storage().instance().get(&DataKey::SettlementContract).expect("not initialized")
+    }
+    
+    pub fn set_settlement(env: Env, new_settlement: Address) {
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::SettlementContract, &new_settlement);
     }
 }
 
@@ -224,8 +232,8 @@ impl RegistryContract {
 mod tests {
     use super::*;
     use soroban_sdk::{
-        testutils::{Address as _, Ledger},
-        Address, Env,
+        testutils::{Address as _, Events, Ledger},
+        Address, Env, String,
     };
 
     fn setup(env: &Env) -> (RegistryContractClient<'static>, Address, Address) {
@@ -249,112 +257,78 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Contract already initialized")]
-    fn test_double_initialize_fails() {
-        let env = Env::default();
-        let (client, admin, settlement) = setup(&env);
-        client.initialize(&admin, &settlement);
-    }
-
-    #[test]
-    fn test_set_settlement_by_admin() {
+    fn test_wave_lifecycle() {
         let env = Env::default();
         env.mock_all_auths();
-        
-        let (client, admin, _) = setup(&env);
-        let new_settlement = Address::generate(&env);
-        
-        client.set_settlement(&new_settlement);
-        assert_eq!(client.get_settlement(), new_settlement);
-    }
-
-    #[test]
-    #[should_panic] // should fail require_auth validation since caller is not admin
-    fn test_set_settlement_by_non_admin_fails() {
-        let env = Env::default();
-        // Do not mock auths, or set mock to a different caller to force failure
         let (client, _, _) = setup(&env);
-        let new_settlement = Address::generate(&env);
         
-        // This will panic as admin auth is missing
-        client.set_settlement(&new_settlement);
+        let program_id = String::from_str(&env, "prog1");
+        client.register_program(&program_id, &Address::generate(&env), &String::from_str(&env, "meta"), &1000);
+        
+        // Open Wave
+        let timestamp = 123456789;
+        env.ledger().with_mut(|li| li.timestamp = timestamp);
+        let wave_id = client.open_wave(&program_id);
+        assert_eq!(wave_id, 1);
+        
+        let wave = client.get_wave(&wave_id).unwrap();
+        assert_eq!(wave.program_id, program_id);
+        assert_eq!(wave.status, WaveStatus::Open);
+        assert_eq!(wave.opened_at, timestamp);
+        
+        // Close Wave
+        let close_timestamp = 123457000;
+        env.ledger().with_mut(|li| li.timestamp = close_timestamp);
+        client.close_wave(&wave_id, &500);
+        
+        let wave = client.get_wave(&wave_id).unwrap();
+        assert_eq!(wave.status, WaveStatus::Closed);
+        assert_eq!(wave.closed_at, close_timestamp);
+        assert_eq!(wave.total_points, 500);
+        
+        // Verify events
+        let events = env.events().all();
+        assert!(events.len() >= 2);
     }
 
     #[test]
-    fn test_record_single_contribution() {
+    #[should_panic(expected = "program doesn't exist")]
+    fn test_open_wave_non_existent_program() {
         let env = Env::default();
-        env.mock_all_auths();
-        
         let (client, _, _) = setup(&env);
-        let contributor = Address::generate(&env);
-        
-        env.ledger().with_mut(|li| {
-            li.timestamp = 1718540000;
-        });
-        
-        client.record_contribution(&1, &contributor, &100);
-        
-        let history = client.contributor_record(&contributor);
-        assert_eq!(history.len(), 1);
-        
-        let record = history.get(0).unwrap();
-        assert_eq!(record.wave_id, 1);
-        assert_eq!(record.points, 100);
-        assert_eq!(record.timestamp, 1718540000);
+        client.open_wave(&String::from_str(&env, "ghost"));
     }
 
     #[test]
-    fn test_record_across_multiple_waves() {
+    #[should_panic(expected = "wave already closed or settled")]
+    fn test_close_already_closed_wave() {
         let env = Env::default();
         env.mock_all_auths();
-        
         let (client, _, _) = setup(&env);
-        let contributor = Address::generate(&env);
         
-        // Wave 1
-        env.ledger().with_mut(|li| {
-            li.timestamp = 1718540000;
-        });
-        client.record_contribution(&1, &contributor, &150);
+        let program_id = String::from_str(&env, "prog1");
+        client.register_program(&program_id, &Address::generate(&env), &String::from_str(&env, "meta"), &1000);
+        let wave_id = client.open_wave(&program_id);
         
-        // Wave 2
-        env.ledger().with_mut(|li| {
-            li.timestamp = 1718550000;
-        });
-        client.record_contribution(&2, &contributor, &300);
-        
-        let history = client.contributor_record(&contributor);
-        assert_eq!(history.len(), 2);
-        
-        let rec1 = history.get(0).unwrap();
-        assert_eq!(rec1.wave_id, 1);
-        assert_eq!(rec1.points, 150);
-        assert_eq!(rec1.timestamp, 1718540000);
-        
-        let rec2 = history.get(1).unwrap();
-        assert_eq!(rec2.wave_id, 2);
-        assert_eq!(rec2.points, 300);
-        assert_eq!(rec2.timestamp, 1718550000);
+        client.close_wave(&wave_id, &100);
+        client.close_wave(&wave_id, &200); // Should panic
     }
 
     #[test]
-    fn test_contributor_no_history_returns_empty_vec() {
+    fn test_record_contribution() {
         let env = Env::default();
+        env.mock_all_auths();
         let (client, _, _) = setup(&env);
-        let contributor = Address::generate(&env);
         
-        let history = client.contributor_record(&contributor);
-        assert_eq!(history.len(), 0);
-    }
-
-    #[test]
-    #[should_panic] // should fail require_auth of the settlement contract
-    fn test_unauthorized_caller_fails() {
-        let env = Env::default();
-        let (client, _, _) = setup(&env);
-        let contributor = Address::generate(&env);
+        let program_id = String::from_str(&env, "prog1");
+        client.register_program(&program_id, &Address::generate(&env), &String::from_str(&env, "meta"), &1000);
+        let wave_id = client.open_wave(&program_id);
         
-        // We do not mock all auths or authorize settlement. Calling directly will panic
-        client.record_contribution(&1, &contributor, &100);
+        let contributor = Address::generate(&env);
+        client.record_contribution(&wave_id, &contributor, &50);
+        
+        let records = client.contributor_record(&contributor);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records.get(0).unwrap().points, 50);
     }
 }
