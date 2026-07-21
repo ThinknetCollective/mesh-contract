@@ -1,0 +1,10 @@
+[package]
+name = "puzzle"
+version = "0.1.0"
+edition = "2021"
+description = "Core puzzle trait, built-in implementations, and registry for ThinkMesh"
+
+[lib]
+crate-type = ["lib"]
+
+[dependencies]
