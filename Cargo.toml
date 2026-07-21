@@ -4,6 +4,7 @@ members = [
     "contracts/registry",
     "contracts/escrow",
     "contracts/settlement",
+    "contracts/puzzle",
 ]
 
 [workspace.dependencies]
