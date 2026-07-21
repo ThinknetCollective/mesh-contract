@@ -75,6 +75,27 @@ chore/maintenance-task
 5. Run static analysis: `npm run slither` (if available)
 6. Open a Pull Request
 
+### Adding a new puzzle type (Rust/puzzle crate)
+
+The puzzle system uses a trait-based registry so new puzzle categories can be added without changing core dispatch logic.
+
+Short guide:
+
+1. Add a new Rust type that implements the `puzzle::traits::Puzzle` trait. Implement these methods:
+   - `name(&self) -> &str` — the unique type name (e.g. "my_puzzle").
+   - `generate(&self, difficulty: Difficulty, seed: u64) -> PuzzleInstance` — produce a deterministic PuzzleInstance.
+   - `check_answer(&self, instance: &PuzzleInstance, answer: &str) -> bool` — validate answers.
+   - `hint(&self, instance: &PuzzleInstance, hint_level: u32) -> String` — return hints.
+   - `difficulty(&self) -> Difficulty` — default difficulty for the type.
+
+2. Register your implementation with `puzzle::PuzzleRegistry` at startup (or from an examples crate) by calling `registry.register(Box::new(YourPuzzle::new()));`.
+
+3. Add unit tests under `contracts/puzzle/src` or in your own crate to exercise generation, checking and hints.
+
+4. (Optional) Provide an example under `examples/` demonstrating third-party registration and usage.
+
+See `contracts/puzzle` for built-in implementations and `examples/third_party_puzzle.rs` for a minimal example.
+
 ---
 
 ## Smart Contract Standards
