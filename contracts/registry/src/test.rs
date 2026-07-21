@@ -133,6 +133,7 @@ fn test_full_wave_lifecycle() {
     let wave = client.get_wave(&wave_id).expect("Wave should exist");
     assert_eq!(wave.status, WaveStatus::Open);
     assert_eq!(wave.program_id, program_id);
+    assert_eq!(wave.difficulty_level, 1); // Default initial difficulty
     
     // 3. Close Wave
     let close_ts = 300000;
