@@ -1,0 +1,12 @@
+[package]
+name = "mesh-puzzle-examples"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[example]]
+name = "third_party_puzzle"
+path = "third_party_puzzle.rs"
+
+[dependencies]
+puzzle = { path = "../contracts/puzzle" }
