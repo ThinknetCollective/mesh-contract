@@ -1,0 +1,11 @@
+[package]
+name = "mesh-puzzle"
+version = "0.1.0"
+edition = "2021"
+description = "Puzzle game CLI with internationalization (i18n) support"
+
+[dependencies]
+fluent-bundle = "0.15"
+unic-langid = "0.9"
+
+[dev-dependencies]

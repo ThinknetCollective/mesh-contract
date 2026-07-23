@@ -190,6 +190,48 @@ A formal bug bounty program is coming. For now, critical vulnerabilities discove
 
 ---
 
+## 🌐 Internationalization (i18n) Support
+
+We use [Mozilla Fluent](https://projectfluent.org/) for managing puzzle text, CLI prompts, hints, error messages, and TUI labels. Contributors can easily add support for new languages without modifying game logic.
+
+### How to Add a New Locale
+
+1. **Locate the locales directory**:
+   Navigate to `contracts/puzzle/locales/`.
+
+2. **Create a new `.ftl` file**:
+   Name your file using standard ISO 639-1 language codes (e.g., `de.ftl` for German, `ja.ftl` for Japanese, `pt.ftl` for Portuguese).
+
+3. **Copy and translate keys**:
+   Copy string definitions from `contracts/puzzle/locales/en.ftl` and translate values into your target language. Preserve variable parameters like `{$lang}` or `{$code}`.
+
+   *Example (`de.ftl`)*:
+   ```fluent
+   welcome-title = Willkommen zur Mesh-Rätsel-Herausforderung!
+   puzzle-prompt = Lösen Sie das Rätsel: Finden Sie den versteckten Hash-Schlüssel.
+   ```
+
+4. **Register the locale in `contracts/puzzle/src/lib.rs`**:
+   Add the locale code and resource file mapping to the `LOCALES` array:
+   ```rust
+   const LOCALES: &[(&str, &str)] = &[
+       ("en", include_str!("../locales/en.ftl")),
+       ("fr", include_str!("../locales/fr.ftl")),
+       ("es", include_str!("../locales/es.ftl")),
+       ("de", include_str!("../locales/de.ftl")), // <-- Add your new locale here
+   ];
+   ```
+
+5. **Test your new locale**:
+   Run the CLI with your locale code:
+   ```bash
+   cargo run -p mesh-puzzle -- --lang de
+   ```
+
+If any keys are missing in your translation file, the i18n system automatically falls back to English (`en`).
+
+---
+
 ## 💧 Support via Drips
 
 If you find this project valuable, consider funding it through [Drips](https://www.drips.network/app/projects/github/ThinknetCollective/mesh-contract). Wave 1 is active — your streaming contribution helps us ship audited contracts faster.
