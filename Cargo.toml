@@ -5,6 +5,8 @@ members = [
     "contracts/escrow",
     "contracts/settlement",
     "crates/leaderboard",
+    "contracts/puzzle",
+    "contracts/scoring",
 ]
 
 [workspace.dependencies]
