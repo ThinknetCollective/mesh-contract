@@ -4,9 +4,10 @@ use soroban_sdk::contracterror;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum ContractError {
-    EmptyResults = 1,
-    ZeroTotalPoints = 2,
-    DuplicateContributor = 3,
-    AlreadySettled = 4,
-    NotInitialized = 5,
+    NotInitialized = 1,
+    AlreadyInitialized = 2,
+    WaveAlreadyExists = 3,
+    WaveNotOpen = 4,
+    WaveNotFound = 5,
+    Unauthorized = 6,
 }

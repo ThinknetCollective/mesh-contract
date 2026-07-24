@@ -44,8 +44,12 @@ impl LocalFileLeaderboard {
         }
 
         let file = File::open(&self.file_path)?;
+        if file.metadata()?.len() == 0 {
+            return Ok(Vec::new());
+        }
         let reader = BufReader::new(file);
-        let entries: Vec<LeaderboardEntry> = serde_json::from_reader(reader).unwrap_or_default();
+        let entries: Vec<LeaderboardEntry> = serde_json::from_reader(reader)
+            .map_err(|e| LeaderboardError::Persistence(format!("Failed to deserialize leaderboard: {}", e)))?;
         Ok(entries)
     }
 

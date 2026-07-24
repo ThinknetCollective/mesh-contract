@@ -1,3 +1,4 @@
+use crate::errors::GameError;
 use crate::local_file::LocalFileLeaderboard;
 use crate::models::{LeaderboardEntry, SortBy};
 use crate::trait_def::Leaderboard;
@@ -54,12 +55,11 @@ pub fn format_leaderboard_table(entries: &[LeaderboardEntry]) -> String {
 }
 
 /// Executes the CLI command with the given arguments and leaderboard implementation.
-pub fn run_cli_with_args<L: Leaderboard>(args: &CliArgs, leaderboard: &L) -> Result<Option<String>, String> {
+pub fn run_cli_with_args<L: Leaderboard>(args: &CliArgs, leaderboard: &L) -> Result<Option<String>, GameError> {
     if args.leaderboard {
-        let sort_by: SortBy = args.sort.parse()?;
+        let sort_by: SortBy = args.sort.parse().map_err(|e| GameError::Config(e))?;
         let top_entries = leaderboard
-            .get_top_entries(args.limit, sort_by)
-            .map_err(|e| e.to_string())?;
+            .get_top_entries(args.limit, sort_by)?;
 
         let output = format_leaderboard_table(&top_entries);
         Ok(Some(output))
@@ -69,7 +69,7 @@ pub fn run_cli_with_args<L: Leaderboard>(args: &CliArgs, leaderboard: &L) -> Res
 }
 
 /// Runs the default CLI workflow loading entries from `LocalFileLeaderboard`.
-pub fn run_cli(args: &CliArgs) -> Result<Option<String>, String> {
+pub fn run_cli(args: &CliArgs) -> Result<Option<String>, GameError> {
     let path = args.file.clone().unwrap_or_else(LocalFileLeaderboard::default_path);
     let leaderboard = LocalFileLeaderboard::new(path);
     run_cli_with_args(args, &leaderboard)

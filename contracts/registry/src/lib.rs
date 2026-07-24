@@ -5,6 +5,7 @@ use soroban_sdk::{
 
 pub mod interfaces;
 use interfaces::types::ProgramConfig;
+use interfaces::errors::ContractError;
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -67,21 +68,24 @@ pub struct RegistryContract;
 #[contractimpl]
 impl RegistryContract {
     /// Initialize the contract with an admin and the authorized settlement contract address.
-    pub fn initialize(env: Env, admin: Address, settlement_contract: Address) {
+    pub fn initialize(env: Env, admin: Address, settlement_contract: Address) -> Result<(), ContractError> {
         if env.storage().instance().has(&DataKey::Admin) {
-            panic!("already initialized");
+            return Err(ContractError::AlreadyInitialized);
         }
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::SettlementContract, &settlement_contract);
         env.storage().instance().set(&DataKey::WaveCounter, &0u32);
         env.storage().instance().set(&DataKey::ProgramCounter, &0u32);
+        Ok(())
     }
 
     /// Set the authorized onboarder address. Only callable by admin.
-    pub fn set_onboarder(env: Env, onboarder: Address) {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
+    pub fn set_onboarder(env: Env, onboarder: Address) -> Result<(), ContractError> {
+        let admin: Address = env.storage().instance().get(&DataKey::Admin)
+            .ok_or(ContractError::NotInitialized)?;
         admin.require_auth();
         env.storage().instance().set(&DataKey::Onboarder, &onboarder);
+        Ok(())
     }
 
     /// Register a new Wave Program. Only callable by admin or onboarder.
@@ -89,22 +93,23 @@ impl RegistryContract {
         env: Env,
         caller: Address,
         config: ProgramConfig,
-    ) -> u32 {
+    ) -> Result<u32, ContractError> {
         caller.require_auth();
 
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
+        let admin: Address = env.storage().instance().get(&DataKey::Admin)
+            .ok_or(ContractError::NotInitialized)?;
         let onboarder: Option<Address> = env.storage().instance().get(&DataKey::Onboarder);
         
         let is_admin = caller == admin;
         let is_onboarder = onboarder.map(|o| o == caller).unwrap_or(false);
 
         if !is_admin && !is_onboarder {
-            panic!("unauthorized: only admin or onboarder can register programs");
+            return Err(ContractError::Unauthorized);
         }
 
         // Duplicate name check
         if env.storage().persistent().has(&DataKey::ProgramName(config.name.clone())) {
-            panic!("program name already exists");
+            return Err(ContractError::ProgramNameExists);
         }
 
         // Increment program counter
@@ -122,13 +127,13 @@ impl RegistryContract {
             (program_id, config.name, config.organizer),
         );
 
-        program_id
+        Ok(program_id)
     }
 
     /// Opens a new wave cycle for a program. Returns wave_id.
-    pub fn open_wave(env: Env, program_id: u32) -> u32 {
+    pub fn open_wave(env: Env, program_id: u32) -> Result<u32, ContractError> {
         if !env.storage().persistent().has(&DataKey::Programs(program_id)) {
-            panic!("program doesn't exist");
+            return Err(ContractError::ProgramNotFound);
         }
 
         // Get or initialize difficulty level for the program
@@ -158,19 +163,19 @@ impl RegistryContract {
             env.ledger().timestamp(),
         );
 
-        wave_id
+        Ok(wave_id)
     }
 
     /// Closes an open wave cycle and marks it ready for settlement.
-    pub fn close_wave(env: Env, wave_id: u32, total_points: u32) {
+    pub fn close_wave(env: Env, wave_id: u32, total_points: u32) -> Result<(), ContractError> {
         let mut wave: WaveMeta = env
             .storage()
             .persistent()
             .get(&DataKey::Waves(wave_id))
-            .expect("wave not found");
+            .ok_or(ContractError::WaveNotFound)?;
 
         if wave.status != WaveStatus::Open {
-            panic!("wave already closed or settled");
+            return Err(ContractError::WaveNotFound); // Or specific Closed status error
         }
 
         wave.closed_at = env.ledger().timestamp();
@@ -187,24 +192,25 @@ impl RegistryContract {
             (symbol_short!("wave_cls"), wave_id, total_points),
             env.ledger().timestamp(),
         );
+        Ok(())
     }
 
     /// Record a contribution points entry. Only callable by settlement contract.
-    pub fn record_contribution(env: Env, wave_id: u32, address: Address, points: u32) {
+    pub fn record_contribution(env: Env, wave_id: u32, address: Address, points: u32) -> Result<(), ContractError> {
         let settlement: Address = env
             .storage().instance()
             .get(&DataKey::SettlementContract)
-            .expect("settlement not set");
+            .ok_or(ContractError::SettlementNotSet)?;
         settlement.require_auth();
 
         let wave: WaveMeta = env
             .storage()
             .persistent()
             .get(&DataKey::Waves(wave_id))
-            .expect("wave not found");
+            .ok_or(ContractError::WaveNotFound)?;
         
         if wave.status != WaveStatus::Open {
-            panic!("wave is not open");
+            return Err(ContractError::WaveNotFound);
         }
 
         let contribution = WaveContribution {
@@ -255,18 +261,19 @@ impl RegistryContract {
         env.storage().persistent().get(&DataKey::Programs(program_id))
     }
 
-    pub fn get_admin(env: Env) -> Address {
-        env.storage().instance().get(&DataKey::Admin).expect("not initialized")
+    pub fn get_admin(env: Env) -> Result<Address, ContractError> {
+        env.storage().instance().get(&DataKey::Admin).ok_or(ContractError::NotInitialized)
     }
 
-    pub fn get_settlement(env: Env) -> Address {
-        env.storage().instance().get(&DataKey::SettlementContract).expect("not initialized")
+    pub fn get_settlement(env: Env) -> Result<Address, ContractError> {
+        env.storage().instance().get(&DataKey::SettlementContract).ok_or(ContractError::NotInitialized)
     }
     
-    pub fn set_settlement(env: Env, new_settlement: Address) {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
+    pub fn set_settlement(env: Env, new_settlement: Address) -> Result<(), ContractError> {
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).ok_or(ContractError::NotInitialized)?;
         admin.require_auth();
         env.storage().instance().set(&DataKey::SettlementContract, &new_settlement);
+        Ok(())
     }
 
     /// Update contributor performance metrics after recording a contribution

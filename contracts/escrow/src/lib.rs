@@ -1,6 +1,7 @@
 #![no_std]
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Map, String};
 mod interfaces;
+use interfaces::errors::ContractError;
 
 #[contract]
 pub struct EscrowContract;
@@ -13,9 +14,9 @@ impl EscrowContract {
         admin: Address,
         registry_contract: Address,
         settlement_contract: Address,
-    ) {
+    ) -> Result<(), ContractError> {
         if env.storage().instance().has(&symbol_short!("admin")) {
-            panic!("already initialized");
+            return Err(ContractError::AlreadyInitialized);
         }
 
         env.storage().instance().set(&symbol_short!("admin"), &admin);
@@ -26,30 +27,31 @@ impl EscrowContract {
             .instance()
             .set(&String::from_str(&env, "settlement_contract"), &settlement_contract);
         env.storage().instance().set(&symbol_short!("wave_cnt"), &0u32);
+        Ok(())
     }
 
     /// Get admin address
-    pub fn get_admin(env: Env) -> Address {
+    pub fn get_admin(env: Env) -> Result<Address, ContractError> {
         env.storage()
             .instance()
             .get(&symbol_short!("admin"))
-            .expect("not initialized")
+            .ok_or(ContractError::NotInitialized)
     }
 
     /// Get registry contract address
-    pub fn get_registry_contract(env: Env) -> Address {
+    pub fn get_registry_contract(env: Env) -> Result<Address, ContractError> {
         env.storage()
             .instance()
             .get(&String::from_str(&env, "registry_contract"))
-            .expect("not initialized")
+            .ok_or(ContractError::NotInitialized)
     }
 
     /// Get settlement contract address
-    pub fn get_settlement_contract(env: Env) -> Address {
+    pub fn get_settlement_contract(env: Env) -> Result<Address, ContractError> {
         env.storage()
             .instance()
             .get(&String::from_str(&env, "settlement_contract"))
-            .expect("not initialized")
+            .ok_or(ContractError::NotInitialized)
     }
     /// Open a new Wave escrow
     pub fn open_wave(

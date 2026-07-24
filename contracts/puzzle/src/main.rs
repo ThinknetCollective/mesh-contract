@@ -5,7 +5,13 @@ fn main() {
     let lang_arg = parse_lang_flag(std::env::args());
     let requested_lang = lang_arg.as_deref();
 
-    let i18n = I18nManager::new(requested_lang);
+    let i18n = match I18nManager::new(requested_lang) {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("Initialization Error: {}", e);
+            std::process::exit(1);
+        }
+    };
 
     if i18n.fallback_triggered() {
         if let Some(requested) = requested_lang {
