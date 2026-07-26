@@ -1,3 +1,7 @@
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "warn"
+
 [workspace]
 resolver = "2"
 members = [

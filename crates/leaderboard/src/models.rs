@@ -1,6 +1,6 @@
+use crate::errors::GameError;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use thiserror::Error;
 
 /// An individual entry recorded on the leaderboard.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -59,14 +59,4 @@ impl fmt::Display for SortBy {
 }
 
 /// Errors returned during leaderboard operations.
-#[derive(Debug, Error)]
-pub enum LeaderboardError {
-    #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("Serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
-
-    #[error("Invalid argument: {0}")]
-    InvalidInput(String),
-}
+pub type LeaderboardError = GameError;

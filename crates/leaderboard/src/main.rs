@@ -9,6 +9,7 @@ fn main() {
             println!("Use --leaderboard to display the top scores.");
         }
         Err(err) => {
+            // Cleanly print readable error strings to standard error channels without backtraces
             eprintln!("Error: {}", err);
             std::process::exit(1);
         }

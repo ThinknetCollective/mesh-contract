@@ -1,6 +1,17 @@
 use fluent_bundle::{FluentArgs, FluentResource, FluentBundle};
 use unic_langid::LanguageIdentifier;
 use std::collections::HashMap;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum PuzzleError {
+    #[error("Language identifier parse error")]
+    LangIdParse,
+    #[error("Failed to parse fluent resource: {0}")]
+    FluentResourceParse(String),
+    #[error("Failed to add resource to bundle")]
+    BundleResourceError,
+}
 
 pub mod test;
 
@@ -21,15 +32,15 @@ pub struct I18nManager {
 impl I18nManager {
     /// Initializes i18n manager with requested locale code (e.g. "fr", "es", "en").
     /// If requested locale is missing or invalid, falls back to "en".
-    pub fn new(requested_locale: Option<&str>) -> Self {
+    pub fn new(requested_locale: Option<&str>) -> Result<Self, PuzzleError> {
         let locale_map: HashMap<&str, &str> = LOCALES.iter().cloned().collect();
         
-        let fallback_lang: LanguageIdentifier = "en".parse().expect("Valid fallback langid");
+        let fallback_lang: LanguageIdentifier = "en".parse().map_err(|_| PuzzleError::LangIdParse)?;
         let mut fallback_bundle = FluentBundle::new(vec![fallback_lang]);
         if let Some(en_src) = locale_map.get("en") {
             let res = FluentResource::try_new(en_src.to_string())
-                .expect("Failed to parse en.ftl resource");
-            fallback_bundle.add_resource(res).expect("Failed to add en resource");
+                .map_err(|(_, errs)| PuzzleError::FluentResourceParse(format!("{:?}", errs)))?;
+            fallback_bundle.add_resource(res).map_err(|_| PuzzleError::BundleResourceError)?;
         }
 
         let requested = requested_locale.unwrap_or("en").to_lowercase();
@@ -41,21 +52,24 @@ impl I18nManager {
 
         let fallback_triggered = target_code != requested.as_str();
 
-        let target_lang: LanguageIdentifier = target_code.parse().unwrap_or_else(|_| "en".parse().unwrap());
+        let target_lang: LanguageIdentifier = target_code.parse().unwrap_or_else(|_| {
+            // SAFETY: "en" is a known valid LanguageIdentifier and is used as a hardcoded fallback.
+            "en".parse().unwrap()
+        });
         let mut active_bundle = FluentBundle::new(vec![target_lang]);
 
         if let Some(src) = locale_map.get(target_code) {
-            if let Ok(res) = FluentResource::try_new(src.to_string()) {
-                let _ = active_bundle.add_resource(res);
-            }
+            let res = FluentResource::try_new(src.to_string())
+                .map_err(|(_, errs)| PuzzleError::FluentResourceParse(format!("{:?}", errs)))?;
+            active_bundle.add_resource(res).map_err(|_| PuzzleError::BundleResourceError)?;
         }
 
-        Self {
+        Ok(Self {
             active_locale: target_code.to_string(),
             active_bundle,
             fallback_bundle,
             fallback_triggered,
-        }
+        })
     }
 
     /// Resolves localized string by key with optional arguments.

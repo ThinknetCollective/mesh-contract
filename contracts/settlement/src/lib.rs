@@ -79,11 +79,11 @@ impl SettlementContract {
         }
 
         let admin_key = symbol_short!("admin");
-        let admin: Address = env.storage().instance().get(&admin_key).expect("not initialized");
+        let admin: Address = env.storage().instance().get(&admin_key).ok_or(ContractError::NotInitialized)?;
         admin.require_auth();
 
         let escrow_key = symbol_short!("escrow");
-        let escrow_address: Address = env.storage().instance().get(&escrow_key).expect("not initialized");
+        let escrow_address: Address = env.storage().instance().get(&escrow_key).ok_or(ContractError::NotInitialized)?;
 
         let contributor_count = results.len();
 
@@ -132,9 +132,9 @@ impl SettlementContract {
     }
 
     /// Get registry contract address
-    pub fn get_registry_contract(env: Env) -> Address {
+    pub fn get_registry_contract(env: Env) -> Result<Address, ContractError> {
         let registry_key = symbol_short!("registry");
-        env.storage().instance().get(&registry_key).expect("not initialized")
+        env.storage().instance().get(&registry_key).ok_or(ContractError::NotInitialized)
     }
 
     /// Get settlement count
