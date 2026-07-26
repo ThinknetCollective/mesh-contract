@@ -4,7 +4,9 @@ use soroban_sdk::{
 };
 
 mod interfaces;
+mod telemetry;
 use interfaces::errors::ContractError;
+use telemetry::TelemetryManager;
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -35,6 +37,10 @@ impl SettlementContract {
         env.storage().instance().set(&registry_key, &registry);
         env.storage().instance().set(&admin_key, &admin);
         env.storage().instance().set(&count_key, &0u32);
+        
+        // Initialize telemetry session for admin
+        TelemetryManager::start_session(&env, admin.clone());
+        TelemetryManager::info(&env, "init", &admin.to_string(), "Settlement contract initialized");
     }
 
     /// Settle a Wave with proportional rewards and input validation
@@ -115,6 +121,9 @@ impl SettlementContract {
             (symbol_short!("Settled"), wave_id),
             (total_points, contributor_count),
         );
+        
+        TelemetryManager::record_success(&env, admin.clone());
+        TelemetryManager::info(&env, "settle", &admin.to_string(), &format!("Wave settled: wave={}, total_points={}, contributors={}", wave_id, total_points, contributor_count));
 
         Ok(())
     }
@@ -128,19 +137,28 @@ impl SettlementContract {
             .get(&wave_status_key)
             .unwrap_or(WaveStatus::Pending);
         
+        let admin_addr = env.storage().instance().get(&symbol_short!("admin")).unwrap_or_else(|| Address::generate(&env));
+        TelemetryManager::record_success(&env, admin_addr);
+        
         wave_status == WaveStatus::Settled
     }
 
     /// Get registry contract address
     pub fn get_registry_contract(env: Env) -> Address {
         let registry_key = symbol_short!("registry");
-        env.storage().instance().get(&registry_key).expect("not initialized")
+        let result = env.storage().instance().get(&registry_key).expect("not initialized");
+        let admin_addr = env.storage().instance().get(&symbol_short!("admin")).unwrap_or_else(|| Address::generate(&env));
+        TelemetryManager::record_success(&env, admin_addr);
+        result
     }
 
     /// Get settlement count
     pub fn get_settlement_count(env: Env) -> u32 {
         let count_key = symbol_short!("stl_cnt");
-        env.storage().instance().get::<_, u32>(&count_key).unwrap_or(0)
+        let result = env.storage().instance().get::<_, u32>(&count_key).unwrap_or(0);
+        let admin_addr = env.storage().instance().get(&symbol_short!("admin")).unwrap_or_else(|| Address::generate(&env));
+        TelemetryManager::record_success(&env, admin_addr);
+        result
     }
 }
 

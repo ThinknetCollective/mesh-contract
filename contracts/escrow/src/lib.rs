@@ -1,6 +1,8 @@
 #![no_std]
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Map, String};
 mod interfaces;
+mod telemetry;
+use telemetry::TelemetryManager;
 
 #[contract]
 pub struct EscrowContract;
@@ -26,6 +28,10 @@ impl EscrowContract {
             .instance()
             .set(&String::from_str(&env, "settlement_contract"), &settlement_contract);
         env.storage().instance().set(&symbol_short!("wave_cnt"), &0u32);
+        
+        // Initialize telemetry session for admin
+        TelemetryManager::start_session(&env, admin.clone());
+        TelemetryManager::info(&env, "initialize", &admin.to_string(), "Escrow contract initialized");
     }
 
     /// Get admin address
@@ -79,6 +85,10 @@ impl EscrowContract {
         let mut count: u32 = env.storage().instance().get(&count_key).unwrap_or(0u32);
         count += 1;
         env.storage().instance().set(&count_key, &count);
+        
+        let admin_addr = env.storage().instance().get(&symbol_short!("admin")).unwrap_or_else(|| Address::generate(&env));
+        TelemetryManager::record_success(&env, admin_addr.clone());
+        TelemetryManager::info(&env, "open_wave", &admin_addr.to_string(), &format!("Wave escrow opened: wave={}, program={}, amount={}", wave_id, program_id, amount));
     }
 
     /// Fund a Wave escrow
@@ -97,7 +107,11 @@ impl EscrowContract {
             env.storage()
                 .instance()
                 .set(&(wave_key, wave_id), &(program_id, creator, new_amount, 1u32)); // Funded status
+            
+            TelemetryManager::record_success(&env, funder.clone());
+            TelemetryManager::info(&env, "fund_wave", &funder.to_string(), &format!("Wave funded: wave={}, amount={}", wave_id, amount));
         } else {
+            TelemetryManager::record_failure(&env, funder.clone());
             panic!("Wave not found");
         }
     }
@@ -176,6 +190,9 @@ impl EscrowContract {
             (symbol_short!("Funded"), program_id),
             (token, amount),
         );
+        
+        TelemetryManager::record_success(&env, admin.clone());
+        TelemetryManager::info(&env, "fund", &admin.to_string(), &format!("Program funded: program={}, amount={}", program_id, amount));
     }
 
     /// Get program vault balance
@@ -186,7 +203,12 @@ impl EscrowContract {
             .instance()
             .get(&balances_key)
             .unwrap_or_else(|| Map::new(&env));
-        balances.get(program_id)
+        let result = balances.get(program_id);
+        
+        let admin_addr = env.storage().instance().get(&symbol_short!("admin")).unwrap_or_else(|| Address::generate(&env));
+        TelemetryManager::record_success(&env, admin_addr);
+        
+        result
     }
 
     /// Release funds from a Wave escrow to a recipient
@@ -235,7 +257,11 @@ impl EscrowContract {
                 (symbol_short!("Released"), wave_id),
                 (recipient, amount),
             );
+            
+            TelemetryManager::record_success(&env, settlement_contract.clone());
+            TelemetryManager::info(&env, "release", &settlement_contract.to_string(), &format!("Funds released: wave={}, recipient={}, amount={}", wave_id, recipient.to_string(), amount));
         } else {
+            TelemetryManager::record_failure(&env, settlement_contract.clone());
             panic!("Wave not found");
         }
     }

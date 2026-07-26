@@ -4,7 +4,9 @@ use soroban_sdk::{
 };
 
 pub mod interfaces;
+pub mod telemetry;
 use interfaces::types::ProgramConfig;
+use telemetry::TelemetryManager;
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -75,6 +77,10 @@ impl RegistryContract {
         env.storage().instance().set(&DataKey::SettlementContract, &settlement_contract);
         env.storage().instance().set(&DataKey::WaveCounter, &0u32);
         env.storage().instance().set(&DataKey::ProgramCounter, &0u32);
+        
+        // Initialize telemetry session for admin
+        TelemetryManager::start_session(&env, admin.clone());
+        TelemetryManager::info(&env, "initialize", &admin.to_string(), "Contract initialized");
     }
 
     /// Set the authorized onboarder address. Only callable by admin.
@@ -82,6 +88,9 @@ impl RegistryContract {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
         admin.require_auth();
         env.storage().instance().set(&DataKey::Onboarder, &onboarder);
+        
+        TelemetryManager::record_success(&env, admin.clone());
+        TelemetryManager::info(&env, "set_onboarder", &admin.to_string(), "Onboarder address set");
     }
 
     /// Register a new Wave Program. Only callable by admin or onboarder.
@@ -121,6 +130,9 @@ impl RegistryContract {
             (symbol_short!("prog_reg"), program_id, config.name.clone(), config.organizer.clone()),
             (program_id, config.name, config.organizer),
         );
+        
+        TelemetryManager::record_success(&env, caller.clone());
+        TelemetryManager::info(&env, "register_program", &caller.to_string(), &format!("Program registered: {}", program_id));
 
         program_id
     }
@@ -157,6 +169,10 @@ impl RegistryContract {
             (symbol_short!("wave_open"), program_id, wave_id, difficulty_level),
             env.ledger().timestamp(),
         );
+        
+        let admin_addr = env.storage().instance().get(&DataKey::Admin).unwrap_or_else(|| Address::generate(&env));
+        TelemetryManager::record_success(&env, admin_addr.clone());
+        TelemetryManager::info(&env, "open_wave", &admin_addr.to_string(), &format!("Wave opened: program={}, wave={}", program_id, wave_id));
 
         wave_id
     }
@@ -187,6 +203,10 @@ impl RegistryContract {
             (symbol_short!("wave_cls"), wave_id, total_points),
             env.ledger().timestamp(),
         );
+        
+        let admin_addr = env.storage().instance().get(&DataKey::Admin).unwrap_or_else(|| Address::generate(&env));
+        TelemetryManager::record_success(&env, admin_addr.clone());
+        TelemetryManager::info(&env, "close_wave", &admin_addr.to_string(), &format!("Wave closed: wave={}, points={}", wave_id, total_points));
     }
 
     /// Record a contribution points entry. Only callable by settlement contract.
@@ -228,6 +248,9 @@ impl RegistryContract {
 
         // Update contributor performance metrics
         Self::update_contributor_performance(&env, address.clone(), points);
+        
+        TelemetryManager::record_success(&env, settlement.clone());
+        TelemetryManager::info(&env, "record_contribution", &settlement.to_string(), &format!("Contribution recorded: wave={}, address={}, points={}", wave_id, address.to_string(), points));
     }
 
     /// Returns the full contribution history for a contributor.
@@ -267,6 +290,9 @@ impl RegistryContract {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
         admin.require_auth();
         env.storage().instance().set(&DataKey::SettlementContract, &new_settlement);
+        
+        TelemetryManager::record_success(&env, admin.clone());
+        TelemetryManager::info(&env, "set_settlement", &admin.to_string(), "Settlement contract address updated");
     }
 
     /// Update contributor performance metrics after recording a contribution
@@ -329,12 +355,17 @@ impl RegistryContract {
 
     /// Get contributor performance metrics
     pub fn get_contributor_performance(env: Env, address: Address) -> Option<ContributorPerformance> {
-        env.storage().persistent().get(&DataKey::ContributorPerformance(address))
+        let result = env.storage().persistent().get(&DataKey::ContributorPerformance(address.clone()));
+        TelemetryManager::record_success(&env, address.clone());
+        result
     }
 
     /// Get current difficulty level for a program
     pub fn get_program_difficulty(env: Env, program_id: u32) -> u32 {
-        env.storage().persistent().get(&DataKey::ProgramDifficulty(program_id)).unwrap_or(1)
+        let result = env.storage().persistent().get(&DataKey::ProgramDifficulty(program_id)).unwrap_or(1);
+        let admin_addr = env.storage().instance().get(&DataKey::Admin).unwrap_or_else(|| Address::generate(&env));
+        TelemetryManager::record_success(&env, admin_addr);
+        result
     }
 
     /// Manually set difficulty level for a program (admin only)
@@ -347,6 +378,9 @@ impl RegistryContract {
         }
 
         env.storage().persistent().set(&DataKey::ProgramDifficulty(program_id), &difficulty);
+        
+        TelemetryManager::record_success(&env, admin.clone());
+        TelemetryManager::info(&env, "set_program_difficulty", &admin.to_string(), &format!("Difficulty set: program={}, difficulty={}", program_id, difficulty));
     }
 }
 
