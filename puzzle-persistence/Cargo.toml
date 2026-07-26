@@ -1,0 +1,30 @@
+[package]
+name = "puzzle-persistence"
+version = "0.1.0"
+edition = "2021"
+description = "Session persistence layer for the puzzle game — save/load to disk (native) or localStorage (WASM)"
+
+[lib]
+name = "puzzle_persistence"
+path = "src/lib.rs"
+
+[features]
+default = []
+wasm = ["web-sys", "js-sys", "wasm-bindgen"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+uuid = { version = "1", features = ["v4"] }
+web-sys = { version = "0.3", features = ["Storage", "Window"], optional = true }
+js-sys = { version = "0.3", optional = true }
+wasm-bindgen = { version = "0.2", optional = true }
+
+[dev-dependencies]
+proptest = "1"
+tempfile = "3"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
